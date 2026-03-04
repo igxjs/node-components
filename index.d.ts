@@ -1,9 +1,8 @@
 import 'express-session';
-import '@types/express';
 
 import { AxiosError } from 'axios';
 import { RedisClientType } from '@redis/client';
-import { Application, RequestHandler, Request, Response, NextFunction, Router } from '@types/express';
+import { Application, RequestHandler, Request, Response, NextFunction, Router } from 'express';
 
 // Session Configuration
 export interface SessionConfig {
@@ -95,7 +94,7 @@ export class SessionManager {
     app: Application,
     updateUser: (user: SessionUser | undefined) => any
   ): Promise<void>;
-  
+
   /**
    * Resource protection middleware
    * @param isDebugging Debugging flag (default: false)
@@ -103,26 +102,26 @@ export class SessionManager {
    * @returns Returns express Request Handler
    */
   authenticate(isDebugging?: boolean, redirectUrl?: string): RequestHandler;
-  
+
   /**
    * SSO callback for successful login
    * @param initUser Initialize user object function
    * @returns Returns express Request Handler
    */
   callback(initUser: (user: SessionUser) => SessionUser): RequestHandler;
-  
+
   /**
    * Get Identity Providers
    * @returns Returns express Request Handler
    */
   identityProviders(): RequestHandler;
-  
+
   /**
    * Application logout (NOT SSO)
    * @returns Returns express Request Handler
    */
   logout(): RequestHandler;
-  
+
   /**
    * Refresh user session
    * @param initUser Initialize user object function
@@ -134,9 +133,9 @@ export class SessionManager {
 // Custom Error class
 export class CustomError extends Error {
   code: number;
-  object;
+  data: object;
   error: object;
-  
+
   /**
    * Construct a custom error
    * @param code Error code
@@ -152,7 +151,7 @@ export class FlexRouter {
   context: string;
   router: Router;
   handlers: RequestHandler[];
-  
+
   /**
    * Constructor
    * @param context Context path
@@ -160,7 +159,7 @@ export class FlexRouter {
    * @param handlers Request handlers (optional)
    */
   constructor(context: string, router: Router, handlers?: RequestHandler[]);
-  
+
   /**
    * Mount router to Express app
    * @param app Express application
@@ -178,19 +177,19 @@ export class RedisManager {
    * @returns Returns true if Redis server is connected
    */
   connect(redisUrl: string, certPath: string): Promise<boolean>;
-  
+
   /**
    * Get Redis client
    * @returns Returns Redis client instance
    */
   getClient(): RedisClientType;
-  
+
   /**
    * Determine if the Redis server is connected
    * @returns Returns true if Redis server is connected
    */
   isConnected(): Promise<boolean>;
-  
+
   /**
    * Disconnect from Redis
    * @returns Returns nothing
@@ -263,6 +262,18 @@ export const httpHelper: {
  */
 export function httpErrorHandler(
   err: CustomError | Error | any,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void;
+
+/**
+ * HTTP not found handler middleware
+ * @param req Express Request
+ * @param res Express Response
+ * @param next Next function
+ */
+export function httpNotFoundHandler(
   req: Request,
   res: Response,
   next: NextFunction
