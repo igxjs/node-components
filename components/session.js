@@ -306,14 +306,18 @@ export class SessionManager {
   refresh(initUser) {
     const idpUrl = '/auth/refresh'.concat('?client_id=').concat(this.#config.SSO_CLIENT_ID);
     return async (req, res, next) => {
-      console.debug('req.user->', req.user);
       try {
+        const { email, attributes } = req.user || { email: '', attributes: {} };
+        if (this.hasLock(email)) {
+          throw new CustomError(httpCodes.CONFLICT, 'User refresh is locked');
+        }
+        this.lock(email);
         const response = await this.#idpRequest.post(idpUrl, {
           user: {
-            email: req.user?.email,
+            email,
             attributes: {
-              idp: req.user?.attributes?.idp,
-              refresh_token: req.user?.attributes?.refresh_token
+              idp: attributes?.idp,
+              refresh_token: attributes?.refresh_token
             },
           }
         });
