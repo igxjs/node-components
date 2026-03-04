@@ -93,6 +93,7 @@ app.get('/auth/logout', session.logout());
 - **`identityProviders()`** - Get available identity providers
 - **`logout()`** - Application logout handler (not SSO logout)
 - **`refresh(initUser)`** - Refresh user session with new token
+- **`redisManager()`** - Get the RedisManager instance (returns RedisManager or null)
 - **`hasLock(email)`** - Check if email has a session refresh lock
 - **`lock(email)`** - Lock email for session refresh (prevents concurrent refreshes)
 - **`clearLocks()`** - Clear expired session refresh locks
@@ -216,7 +217,8 @@ import {
   CustomError, 
   httpErrorHandler, 
   httpCodes, 
-  httpMessages 
+  httpMessages,
+  httpHelper 
 } from '@igxjs/node-components';
 ```
 
@@ -235,13 +237,28 @@ throw new CustomError(
   { originalError: err },
   { attemptedEmail: email }
 );
+```
 
-// Try to extract error from Axios/HTTP errors
+**Handling Axios/HTTP Errors:**
+
+```javascript
+// Use httpHelper to handle Axios errors
 try {
   await axios.get('https://api.example.com/data');
 } catch (error) {
-  throw CustomError.tryAxiosError(error, 'Failed to fetch data');
+  // Convert Axios error to CustomError
+  throw httpHelper.handleAxiosError(error, 'Failed to fetch data');
 }
+
+// Or use it in error handling
+app.get('/api/data', async (req, res, next) => {
+  try {
+    const response = await axios.get('https://external-api.com/data');
+    res.json(response.data);
+  } catch (error) {
+    return next(httpHelper.handleAxiosError(error, 'Failed to fetch external data'));
+  }
+});
 ```
 
 **Error Handler Middleware:**
@@ -293,17 +310,34 @@ httpMessages.BAD_REQUEST   // 'Bad Request'
 // - code: number - HTTP status code
 // - message: string - Error message
 // - error: object (optional) - Original error object
-// - data: object (optional) - Additional error data
+// -  object (optional) - Additional error data
 ```
 
-**Static Methods:**
-- **`CustomError.tryAxiosError(error, defaultMessage)`** - Analyze and convert Axios/HTTP errors to CustomError
-- **`CustomError.getErrorCode(error)`** - Extract HTTP status code from error object
-- **`CustomError.getErrorMessage(error, defaultMessage)`** - Extract error message from error object
+**Properties:**
+- **`code`** - HTTP status code (number)
+- **`message`** - Error message (string)
+- **`error`** - Original error object (if provided)
+- **`data`** - Additional error data (if provided)
 
-**Instance Methods:**
-- **`getData()`** - Get additional error data
-- **`getError()`** - Get original error object
+#### httpHelper API
+
+The `httpHelper` object provides utility methods for error handling:
+
+**Methods:**
+
+- **`httpHelper.handleAxiosError(error, defaultMessage)`** - Analyze and convert Axios/HTTP errors to CustomError
+  - `error` (Error | AxiosError) - The error object to analyze
+  - `defaultMessage` (string, optional) - Default message if error message cannot be extracted (default: 'An error occurred')
+  - Returns: `CustomError` instance with extracted status code, message, and data
+
+- **`httpHelper.format(str, ...args)`** - Format a string with placeholders
+  - `str` (string) - String with `{0}`, `{1}`, etc. placeholders
+  - `...args` - Values to replace placeholders
+  - Returns: Formatted string
+
+- **`httpHelper.toZodMessage(error)`** - Generate friendly Zod validation error message
+  - `error` (ZodError) - Zod validation error
+  - Returns: Formatted error message string
 
 ---
 
@@ -331,6 +365,8 @@ This package includes TypeScript definitions. You can import types in TypeScript
 import type { 
   SessionConfig, 
   SessionManager,
+  SessionUser,
+  SessionUserAttributes,
   FlexRouter,
   RedisManager,
   CustomError 

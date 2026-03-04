@@ -4,7 +4,7 @@ import { jwtDecrypt } from 'jose';
 import { RedisStore } from 'connect-redis';
 import memStore from 'memorystore';
 
-import { CustomError, httpCodes, httpMessages } from './http-handlers.js';
+import { CustomError, httpCodes, httpHelper, httpMessages } from './http-handlers.js';
 import { RedisManager } from './redis.js';
 
 const MemoryStore = memStore(session);
@@ -270,7 +270,7 @@ export class SessionManager {
         throw new CustomError(response.status, response.statusText);
       }
       catch(error) {
-        return next(CustomError.tryAxiosError(error));
+        return next(httpHelper.handleAxiosError(error));
       }
     };
   }
@@ -330,7 +330,7 @@ export class SessionManager {
         throw new CustomError(response.status, response.statusText);
       }
       catch(error) {
-        return next(CustomError.tryAxiosError(error));
+        return next(httpHelper.handleAxiosError(error));
       }
     };
   }

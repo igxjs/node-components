@@ -11,7 +11,7 @@ declare global {
 }
 
 // Session Configuration
-export class SessionConfig {
+export interface SessionConfig {
   SSO_ENDPOINT_URL?: string;
   SSO_CLIENT_ID?: string;
   SSO_CLIENT_SECRET?: string;
@@ -140,7 +140,7 @@ export class SessionManager {
 // Custom Error class
 export class CustomError extends Error {
   code: number;
-  data: object;
+  object;
   error: object;
   
   /**
@@ -151,41 +151,6 @@ export class CustomError extends Error {
    * @param data Additional data (optional)
    */
   constructor(code: number, message: string, error?: object, data?: object);
-  
-  /**
-   * Try to analyze axios Error
-   * @param error Error object
-   * @param defaultMessage Default error message
-   * @returns Returns CustomError instance
-   */
-  static tryAxiosError(error: Error | AxiosError, defaultMessage?: string): CustomError;
-  
-  /**
-   * Extract HTTP status code from error
-   * @param error Error object
-   * @returns HTTP status code
-   */
-  static getErrorCode(error: Error): number;
-  
-  /**
-   * Extract error message from error
-   * @param error Error object
-   * @param defaultMessage Default message
-   * @returns Error message
-   */
-  static getErrorMessage(error: Error, defaultMessage: string): string;
-  
-  /**
-   * Get error data
-   * @returns Error data
-   */
-  getData(): object | undefined;
-  
-  /**
-   * Get original error
-   * @returns Original error
-   */
-  getError(): object | undefined;
 }
 
 // Singleton session instance
@@ -242,9 +207,61 @@ export class RedisManager {
   disConnect(): Promise<void>;
 }
 
-// HTTP Handlers exports
-export const httpCodes: Record<string, number>;
-export const httpMessages: Record<string, string>;
+// HTTP status code keys (exposed for type safety)
+export const httpCodes: {
+  OK: number;
+  CREATED: number;
+  NO_CONTENT: number;
+  BAD_REQUEST: number;
+  UNAUTHORIZED: number;
+  FORBIDDEN: number;
+  NOT_FOUND: number;
+  NOT_ACCEPTABLE: number;
+  CONFLICT: number;
+  SYSTEM_FAILURE: number;
+};
+
+// HTTP message keys (exposed for type safety)
+export const httpMessages: {
+  OK: string;
+  CREATED: string;
+  NO_CONTENT: string;
+  BAD_REQUEST: string;
+  UNAUTHORIZED: string;
+  FORBIDDEN: string;
+  NOT_FOUND: string;
+  NOT_ACCEPTABLE: string;
+  CONFLICT: string;
+  SYSTEM_FAILURE: string;
+};
+
+/**
+ * HTTP Helper utilities
+ */
+export const httpHelper: {
+  /**
+   * Format a string with placeholders
+   * @param str String with {0}, {1}, etc. placeholders
+   * @param args Values to replace placeholders
+   * @returns Formatted string
+   */
+  format(str: string, ...args: any[]): string;
+
+  /**
+   * Generate friendly Zod validation error message
+   * @param error Zod validation error
+   * @returns Formatted error message
+   */
+  toZodMessage(error: any): string;
+
+  /**
+   * Analyze and convert Axios/HTTP errors to CustomError
+   * @param error Error object
+   * @param defaultMessage Default error message
+   * @returns CustomError instance
+   */
+  handleAxiosError(error: Error | AxiosError, defaultMessage?: string): CustomError;
+};
 
 /**
  * Custom error handler middleware

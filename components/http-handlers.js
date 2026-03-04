@@ -156,7 +156,7 @@ export const httpHelper = {
    * @param {string} defaultMessage Default error message
    * @returns {CustomError} Returns CustomError instance
    */
-  tryAxiosError(error, defaultMessage = 'An error occurred') {
+  handleAxiosError(error, defaultMessage = 'An error occurred') {
     console.warn(`### TRY ERROR: ${defaultMessage} ###`);
     // Extract error details
     const errorCode = _getErrorCode(error);
