@@ -32,7 +32,7 @@ const config = {
   SESSION_AGE: 64800000, // 18 hours in milliseconds
   SESSION_COOKIE_PATH: '/',
   SESSION_SECRET: 'your-session-secret',
-  SESSION_PREFIX: 'app:',
+  SESSION_PREFIX: 'ibmid:',  // Default value when not provided
   
   // Redis Configuration (optional - uses memory store if not provided)
   REDIS_URL: 'redis://localhost:6379',
@@ -285,9 +285,9 @@ app.use(httpErrorHandler);
 #### HTTP Codes & Messages
 
 ```javascript
-httpCodes.OK                // 200
+httpCodes.OK               // 200
 httpCodes.CREATED          // 201
-httpCodes.NO_CONTENT       // 201
+httpCodes.NO_CONTENT       // 204
 httpCodes.BAD_REQUEST      // 400
 httpCodes.UNAUTHORIZED     // 401
 httpCodes.FORBIDDEN        // 403
