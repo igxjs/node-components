@@ -11,6 +11,7 @@ export const httpMessages = {
   NOT_ACCEPTABLE: 'Not Acceptable',
   CONFLICT: 'Conflict',
   SYSTEM_FAILURE: 'System Error',
+  NOT_IMPLEMENTED: 'Not Implemented',
 };
 
 export const httpCodes = {

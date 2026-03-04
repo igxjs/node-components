@@ -209,6 +209,7 @@ export const httpCodes: {
   NOT_ACCEPTABLE: number;
   CONFLICT: number;
   SYSTEM_FAILURE: number;
+  NOT_IMPLEMENTED: number;
 };
 
 // HTTP message keys (exposed for type safety)
@@ -223,6 +224,7 @@ export const httpMessages: {
   NOT_ACCEPTABLE: string;
   CONFLICT: string;
   SYSTEM_FAILURE: string;
+  NOT_IMPLEMENTED: string;
 };
 
 /**

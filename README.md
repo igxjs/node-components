@@ -295,6 +295,7 @@ httpCodes.NOT_FOUND        // 404
 httpCodes.NOT_ACCEPTABLE   // 406
 httpCodes.CONFLICT         // 409
 httpCodes.SYSTEM_FAILURE   // 500
+httpCodes.NOT_IMPLEMENTED  // 501
 
 // Corresponding messages
 httpMessages.OK            // 'OK'
