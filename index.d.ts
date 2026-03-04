@@ -93,7 +93,6 @@ export class SessionManager {
    */
   setup(
     app: Application,
-    config: SessionConfig,
     updateUser: (user: SessionUser | undefined) => any
   ): Promise<void>;
   

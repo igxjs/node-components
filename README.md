@@ -87,7 +87,7 @@ app.get('/auth/logout', session.logout());
 
 #### API Methods
 
-- **`setup(app, config, updateUser)`** - Initialize session configurations
+- **`setup(app, updateUser)`** - Initialize session configurations
 - **`authenticate(isDebugging?, redirectUrl?)`** - Resource protection middleware
 - **`callback(initUser)`** - SSO callback handler for successful login
 - **`identityProviders()`** - Get available identity providers
