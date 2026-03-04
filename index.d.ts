@@ -1,8 +1,9 @@
+import 'express-session';
 import '@types/express';
+
 import { AxiosError } from 'axios';
 import { RedisClientType } from '@redis/client';
 import { Application, RequestHandler, Request, Response, NextFunction, Router } from '@types/express';
-import 'express-session';
 
 // Session Configuration
 export interface SessionConfig {
@@ -271,10 +272,11 @@ export function httpErrorHandler(
   next: NextFunction
 ): void;
 
-declare global {
-  namespace Express {
-    export interface Session {
-      user: SessionUser?;
-    }
+// Augment Express Session with custom user property
+declare module 'express-session' {
+  interface SessionData {
+    /** @type {SessionUser | undefined} User session */
+    [key: string]: any;
+    user?: SessionUser;
   }
 }
