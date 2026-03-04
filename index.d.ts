@@ -1,12 +1,11 @@
 import { AxiosError } from 'axios';
 import { RedisClientType } from '@redis/client';
 import { Application, RequestHandler, Request, Response, NextFunction, Router } from '@types/express';
+import "express-session";
 
-declare global {
-  namespace Express {
-    export interface Session {
-      user?: SessionUser;
-    }
+declare module "express-session" {
+  interface SessionData {
+    user: SessionUser;
   }
 }
 
@@ -88,19 +87,19 @@ export class SessionManager {
    * Initialize the session configurations
    * @param app Express application
    * @param config Session configurations
-   * @param processUser Process user object to compute attributes like permissions, avatar URL, etc.
+   * @param updateUser Process user object to compute attributes like permissions, avatar URL, etc.
    */
-  init(
+  setup(
     app: Application,
     config: SessionConfig,
-    processUser: (user: SessionUser | undefined) => any
+    updateUser: (user: SessionUser | undefined) => any
   ): Promise<void>;
   
   /**
    * Get session RequestHandler
    * @returns Returns RequestHandler instance of Express
    */
-  getSession(): Promise<RequestHandler>;
+  sessionHandler(): Promise<RequestHandler>;
   
   /**
    * Resource protection middleware

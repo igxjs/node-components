@@ -97,13 +97,12 @@ export class SessionManager {
   }
 
   /**
-   * Initialize the session configurations
+   * Setup the session/user handlers with configurations
    * @param {import('@types/express').Application} app Express application
    * @param {SessionConfig} config Redis configurations
-   * @param {(user: object) => object} processUser Process user object in order to compute if user should have proper attributes, e.g. permissions, avatar URL
+   * @param {(user: object) => object} updateUser Update user object if user should have proper attributes, e.g. permissions, avatar URL
    */
-  async init(app, config, processUser) {
-    app.set('trust proxy', 1);
+  async setup(app, config, updateUser) {
     this.#redisManager = new RedisManager();
     this.#config = {
       // Session
@@ -121,12 +120,14 @@ export class SessionManager {
       REDIS_URL: config.REDIS_URL,
       REDIS_CERT_PATH: config.REDIS_CERT_PATH,
     };
-    app.use(await this.getSession());
-    app.use(this.#userHandler(processUser));
+    // Identity Provider Request
     this.#idpRequest = axios.create({
       baseURL: this.#config.SSO_ENDPOINT_URL,
       timeout: 30000,
     });
+    app.set('trust proxy', 1);
+    app.use(await this.sessionHandler());
+    app.use(this.#userHandler(updateUser));
   }
 
   /**
@@ -163,7 +164,7 @@ export class SessionManager {
    * Get session RequestHandler
    * @returns {Promise<import('@types/express').RequestHandler>} Returns RequestHandler instance of Express
    */
-  async getSession() {
+  async sessionHandler() {
     if(this.#config.REDIS_URL?.length > 0) {
       await this.#redisManager.connect(this.#config.REDIS_URL, this.#config.REDIS_CERT_PATH);
       return this.#redisSession();
@@ -173,14 +174,14 @@ export class SessionManager {
 
   /**
    * User HTTP Handler
-   * @param {(user: object) => object} processUser User wrapper
+   * @param {(user: object) => object} updateUser User wrapper
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
-  #userHandler (processUser) {
+  #userHandler (updateUser) {
     return (req, res, next) => {
       req.user = req.session[this.#getSessionKey()];
       /** @type {import('@types/express').Request & { user: object }} Session user */
-      res.locals.user = processUser(req.user);
+      res.locals.user = updateUser(req.user);
       return next();
     };
   }

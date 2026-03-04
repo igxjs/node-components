@@ -49,7 +49,7 @@ import { session } from '@igxjs/node-components';
 const app = express();
 
 // Initialize session
-await session.init(app, config, (user) => {
+await session.setup(app, config, (user) => {
   // Process user object - compute permissions, avatar URL, etc.
   return {
     ...user,
@@ -86,8 +86,8 @@ app.get('/auth/logout', session.logout());
 
 #### API Methods
 
-- **`init(app, config, processUser)`** - Initialize session configurations
-- **`getSession()`** - Get session RequestHandler (returns Promise<RequestHandler>)
+- **`setup(app, config, updateUser)`** - Initialize session configurations
+- **`sessionHandler()`** - Session RequestHandler (returns Promise<RequestHandler>)
 - **`authenticate(isDebugging?, redirectUrl?)`** - Resource protection middleware
 - **`callback(initUser)`** - SSO callback handler for successful login
 - **`identityProviders()`** - Get available identity providers
