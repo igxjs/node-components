@@ -142,9 +142,6 @@ export class CustomError extends Error {
   constructor(code: number, message: string, error?: object, data?: object);
 }
 
-// Singleton session instance
-export const session: SessionManager;
-
 // FlexRouter class for Express routing
 export class FlexRouter {
   context: string;
