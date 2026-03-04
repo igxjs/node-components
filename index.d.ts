@@ -57,6 +57,12 @@ export interface SessionUser {
 // Session Manager
 export class SessionManager {
   /**
+   * Constructor
+   * @param config - Session configuration
+   */
+  constructor(config: SessionConfig);
+
+  /**
    * Check if the email has a session refresh lock
    * @param email Email address
    * @returns Returns true if the email has a session refresh lock
