@@ -9,7 +9,6 @@ describe('SessionManager', () => {
   let clock;
 
   beforeEach(() => {
-    sessionManager = new SessionManager();
     clock = sinon.useFakeTimers();
   });
 
@@ -24,6 +23,7 @@ describe('SessionManager', () => {
       expect(config).to.have.property('SSO_ENDPOINT_URL');
       expect(config).to.have.property('SESSION_SECRET');
       expect(config).to.have.property('REDIS_URL');
+      sessionManager = new SessionManager(config);
     });
   });
 

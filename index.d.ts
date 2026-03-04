@@ -92,12 +92,6 @@ export class SessionManager {
   ): Promise<void>;
   
   /**
-   * Get session RequestHandler
-   * @returns Returns RequestHandler instance of Express
-   */
-  sessionHandler(): Promise<RequestHandler>;
-  
-  /**
    * Resource protection middleware
    * @param isDebugging Debugging flag (default: false)
    * @param redirectUrl Redirect URL (default: '')

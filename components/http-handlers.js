@@ -24,6 +24,7 @@ export const httpCodes = {
   NOT_ACCEPTABLE: 406,
   CONFLICT: 409,
   SYSTEM_FAILURE: 500,
+  NOT_IMPLEMENTED: 501,
 };
 
 export class CustomError extends Error {
@@ -47,7 +48,7 @@ export class CustomError extends Error {
 }
 
 /**
- * Custom error handler
+ * Custom Error handler
  *
  * @param {CustomError} err Error
  * @param {import('@types/express').Request} req Request
@@ -96,6 +97,16 @@ export const httpErrorHandler = (err, req, res, next) => {
   }
 
   console.error('### /ERROR ###');
+};
+
+/**
+ * HTTP not found error handler
+ * @param {Request} _req Request object
+ * @param {Response} _res Response object
+ * @param {NextFunction} next Next function
+ */
+export const httpNotFoundHandler = (_req, _res, next) => {
+  next(new CustomError(httpCodes.NOT_FOUND, httpMessages.NOT_FOUND));
 };
 
 /**
@@ -164,4 +175,16 @@ export const httpHelper = {
     const errorData = error.response?.data || {};
     return new CustomError(errorCode, errorMessage, error, errorData);
   }
+};
+
+/**
+ * HTTP Error - alias of `new CustomError()`
+ * @param {Number} code Error code
+ * @param {string} message Error message
+ * @param {Error} error Original Error instance
+ * @param {any} data Error data
+ * @returns {CustomError} Returns a new instance of CustomError
+ */
+export const httpError = (code, message, error, data) => {
+  return new CustomError(code, message, error, data);
 };

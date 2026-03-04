@@ -1,8 +1,8 @@
 import axios from 'axios';
 import session from 'express-session';
-import { jwtDecrypt } from 'jose';
-import { RedisStore } from 'connect-redis';
 import memStore from 'memorystore';
+import { RedisStore } from 'connect-redis';
+import { jwtDecrypt } from 'jose';
 
 import { CustomError, httpCodes, httpHelper, httpMessages } from './http-handlers.js';
 import { RedisManager } from './redis.js';
@@ -45,6 +45,29 @@ export class SessionManager {
   #redisManager = null;
   /** @type {import('axios').AxiosInstance} */
   #idpRequest = null;
+
+  /**
+   * Create a new session manager
+   * @param {SessionConfig} config Session configuration
+   */
+  constructor(config) {
+    this.#config = {
+      // Session
+      SESSION_AGE: config.SESSION_AGE || 64800000,
+      SESSION_COOKIE_PATH: config.SESSION_COOKIE_PATH || '/',
+      SESSION_SECRET: config.SESSION_SECRET,
+      SESSION_PREFIX: config.SESSION_PREFIX || 'ibmid:',
+      // Identity Provider
+      SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
+      SSO_CLIENT_ID: config.SSO_CLIENT_ID,
+      SSO_CLIENT_SECRET: config.SSO_CLIENT_SECRET,
+      SSO_SUCCESS_URL: config.SSO_SUCCESS_URL,
+      SSO_FAILURE_URL: config.SSO_FAILURE_URL,
+      // Redis
+      REDIS_URL: config.REDIS_URL,
+      REDIS_CERT_PATH: config.REDIS_CERT_PATH,
+    };
+  }
 
   /**
    * Check if the email has a session refresh lock
@@ -99,34 +122,17 @@ export class SessionManager {
   /**
    * Setup the session/user handlers with configurations
    * @param {import('@types/express').Application} app Express application
-   * @param {SessionConfig} config Redis configurations
    * @param {(user: object) => object} updateUser Update user object if user should have proper attributes, e.g. permissions, avatar URL
    */
-  async setup(app, config, updateUser) {
+  async setup(app, updateUser) {
     this.#redisManager = new RedisManager();
-    this.#config = {
-      // Session
-      SESSION_AGE: config.SESSION_AGE || 64800000,
-      SESSION_COOKIE_PATH: config.SESSION_COOKIE_PATH || '/',
-      SESSION_SECRET: config.SESSION_SECRET,
-      SESSION_PREFIX: config.SESSION_PREFIX || 'ibmid:',
-      // Identity Provider
-      SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
-      SSO_CLIENT_ID: config.SSO_CLIENT_ID,
-      SSO_CLIENT_SECRET: config.SSO_CLIENT_SECRET,
-      SSO_SUCCESS_URL: config.SSO_SUCCESS_URL,
-      SSO_FAILURE_URL: config.SSO_FAILURE_URL,
-      // Redis
-      REDIS_URL: config.REDIS_URL,
-      REDIS_CERT_PATH: config.REDIS_CERT_PATH,
-    };
     // Identity Provider Request
     this.#idpRequest = axios.create({
       baseURL: this.#config.SSO_ENDPOINT_URL,
       timeout: 30000,
     });
     app.set('trust proxy', 1);
-    app.use(await this.sessionHandler());
+    app.use(await this.#sessionHandler());
     app.use(this.#userHandler(updateUser));
   }
 
@@ -164,7 +170,7 @@ export class SessionManager {
    * Get session RequestHandler
    * @returns {Promise<import('@types/express').RequestHandler>} Returns RequestHandler instance of Express
    */
-  async sessionHandler() {
+  async #sessionHandler() {
     if(this.#config.REDIS_URL?.length > 0) {
       await this.#redisManager.connect(this.#config.REDIS_URL, this.#config.REDIS_CERT_PATH);
       return this.#redisSession();
