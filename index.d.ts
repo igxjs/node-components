@@ -1,13 +1,8 @@
+import '@types/express';
 import { AxiosError } from 'axios';
 import { RedisClientType } from '@redis/client';
 import { Application, RequestHandler, Request, Response, NextFunction, Router } from '@types/express';
-import "express-session";
-
-declare module "express-session" {
-  interface SessionData {
-    user: SessionUser;
-  }
-}
+import 'express-session';
 
 // Session Configuration
 export interface SessionConfig {
@@ -275,3 +270,11 @@ export function httpErrorHandler(
   res: Response,
   next: NextFunction
 ): void;
+
+declare global {
+  namespace Express {
+    export interface Session {
+      user: SessionUser?;
+    }
+  }
+}
