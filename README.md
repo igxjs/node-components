@@ -159,6 +159,8 @@ routers.forEach(router => {
 
 Redis connection management with TLS support and automatic reconnection handling.
 
+* Note: the RedisManager is used internally by the `SessionManager`, so you don't need to use it directly.
+
 #### Usage Example
 
 ```javascript

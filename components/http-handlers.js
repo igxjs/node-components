@@ -44,64 +44,6 @@ export class CustomError extends Error {
     this.error = error;
     this.data = data;
   }
-
-  /**
-   * Try to analyze axios Error
-   * @param {Error | import('axios').AxiosError} error Error object
-   * @param {string} defaultMessage Default error message
-   * @returns {CustomError} Returns CustomError instance
-   */
-  static tryAxiosError(error, defaultMessage = 'An error occurred') {
-    console.warn(`### TRY ERROR: ${defaultMessage} ###`);
-    // Extract error details
-    const errorCode = getErrorCode(error);
-    const errorMessage = getErrorMessage(error, defaultMessage);
-    const errorData = error.response?.data || {};
-    return new CustomError(errorCode, errorMessage, error, errorData);
-  }
-
-  /**
-   * Extract HTTP status code from error
-   * @param {Error} error Error object
-   * @returns {number} HTTP status code
-   */
-  static getErrorCode(error) {
-    const statusCode = error.response?.status;
-    // Validate it's a valid HTTP status code
-    if (statusCode && typeof statusCode === 'number' && Object.hasOwn(STATUS_CODES, statusCode)) {
-      return statusCode;
-    }
-    return httpCodes.SYSTEM_FAILURE;
-  }
-
-  /**
-   * Extract error message from error
-   * @param {Error} error Error object
-   * @param {string} defaultMessage Default message
-   * @returns {string} Error message
-   */
-  static getErrorMessage(error, defaultMessage) {
-    // Priority: response.data.message > response.statusText > error.message > default
-    return error.response?.data?.message 
-      || error.response?.statusText 
-      || error.message 
-      || defaultMessage;
-  }
-
-  /**
-   * Get error data
-   * @returns {object?} Error data
-   */
-  getData() {
-    return this.data;
-  }
-  /**
-   * Get original error
-   * @returns {object?} Original error
-   */
-  getError() {
-    return this.error;
-  }
 }
 
 /**
@@ -154,4 +96,72 @@ export const httpErrorHandler = (err, req, res, next) => {
   }
 
   console.error('### /ERROR ###');
+};
+
+/**
+ * Extract HTTP status code from error
+ * @param {Error} error Error object
+ * @returns {number} HTTP status code
+ */
+const _getErrorCode = (error) => {
+  const statusCode = error.response?.status;
+  // Validate it's a valid HTTP status code
+  if (statusCode && typeof statusCode === 'number' && Object.hasOwn(STATUS_CODES, statusCode)) {
+    return statusCode;
+  }
+  return httpCodes.SYSTEM_FAILURE;
+};
+
+/**
+ * Extract error message from error
+ * @param {Error} error Error object
+ * @param {string} defaultMessage Default message
+ * @returns {string} Error message
+ */
+const _getErrorMessage = (error, defaultMessage) => {
+  // Priority: response.data.message > response.statusText > error.message > default
+  return error.response?.data?.message
+    || error.response?.statusText
+    || error.message
+    || defaultMessage;
+};
+
+export const httpHelper = {
+  format (str, ...args) {
+    const matched = str.match(/{\d}/ig);
+    matched.forEach((element, index) => {
+      if(args.length > index)
+        str = str.replace(element, args[index]);
+    });
+    return str;
+  },
+
+  /**
+   * Generate friendly Zod message
+   * @param {Error} error Zod error
+   * @returns {string} Returns friendly Zod message
+   */
+  toZodMessage(error) {
+    return error.issues
+    .map(issue => {
+      const path = issue.path.join('.');
+      return (path ? '['.concat(path).concat('] ').concat('') : '').concat(issue.message);
+    })
+    .join('; ');
+  },
+
+  /**
+   * Try to analyze axios Error
+   * @param {Error | import('axios').AxiosError} error Error object
+   * @param {string} defaultMessage Default error message
+   * @returns {CustomError} Returns CustomError instance
+   */
+  tryAxiosError(error, defaultMessage = 'An error occurred') {
+    console.warn(`### TRY ERROR: ${defaultMessage} ###`);
+    // Extract error details
+    const errorCode = _getErrorCode(error);
+    const errorMessage = _getErrorMessage(error, defaultMessage);
+    const errorData = error.response?.data || {};
+    return new CustomError(errorCode, errorMessage, error, errorData);
+  }
 };
