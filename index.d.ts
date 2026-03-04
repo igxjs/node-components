@@ -272,10 +272,17 @@ export function httpErrorHandler(
   next: NextFunction
 ): void;
 
+declare global {
+  namespace Express {
+    export interface Request {
+      user?: SessionUser;
+    }
+  }
+}
+
 // Augment Express Session with custom user property
 declare module 'express-session' {
   interface SessionData {
-    /** @type {SessionUser | undefined} User session */
     [key: string]: any;
     user?: SessionUser;
   }
