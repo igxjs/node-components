@@ -36,5 +36,8 @@
     "sinon": "^21.0.2",
     "supertest": "^7.0.0"
   },
-  "types": "./index.d.ts"
+  "publishConfig": {
+    "access": "public"
+  },
+  "types": "./index.d.ts",
 }
