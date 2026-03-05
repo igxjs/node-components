@@ -13,17 +13,51 @@ JwtManager provides secure token-based authentication using:
 
 ## Configuration Options
 
+### Constructor Options
+
+Constructor options use `JWT_` prefix with UPPERCASE naming convention:
+
 ```javascript
-// Example configuration object
 const jwtOptions = {
-  algorithm: 'dir',              // JWE algorithm (default: 'dir')
-  encryption: 'A256GCM',         // JWE encryption method (default: 'A256GCM')
-  expirationTime: '10m',         // Token expiration (default: '10m')
-  clockTolerance: 30,            // Clock tolerance in seconds (default: 30)
-  secretHashAlgorithm: 'SHA-256', // Hash algorithm for secret derivation (default: 'SHA-256')
-  issuer: 'your-app',            // Optional JWT issuer claim
-  audience: 'your-users',        // Optional JWT audience claim
-  subject: 'user-session'        // Optional JWT subject claim
+  JWT_ALGORITHM: 'dir',              // JWE algorithm (default: 'dir')
+  JWT_ENCRYPTION: 'A256GCM',         // JWE encryption method (default: 'A256GCM')
+  JWT_EXPIRATION_TIME: '10m',        // Token expiration (default: '10m')
+  JWT_CLOCK_TOLERANCE: 30,           // Clock tolerance in seconds (default: 30)
+  JWT_SECRET_HASH_ALGORITHM: 'SHA-256', // Hash algorithm for secret derivation (default: 'SHA-256')
+  JWT_ISSUER: 'your-app',            // Optional JWT issuer claim
+  JWT_AUDIENCE: 'your-users',        // Optional JWT audience claim
+  JWT_SUBJECT: 'user-session'        // Optional JWT subject claim
+};
+```
+
+### encrypt() Method Options
+
+Per-call encryption options use camelCase naming convention:
+
+```javascript
+const encryptOptions = {
+  algorithm: 'dir',              // JWE algorithm (overrides constructor default)
+  encryption: 'A256GCM',         // JWE encryption method
+  expirationTime: '1h',          // Token expiration time
+  clockTolerance: 30,            // Clock tolerance for validation
+  secretHashAlgorithm: 'SHA-256' // Hash algorithm for secret derivation
+};
+
+// Add optional JWT claims
+encryptOptions.issuer = 'my-app';
+encryptOptions.audience = 'my-users';
+```
+
+### decrypt() Method Options
+
+Per-call decryption options use camelCase naming convention:
+
+```javascript
+const decryptOptions = {
+  clockTolerance: 30,            // Clock tolerance for validation (default: 30)
+  issuer: 'my-app',              // Expected issuer claim for validation
+  audience: 'my-users',          // Expected audience claim for validation
+  subject: 'user-session'        // Expected subject claim for validation
 };
 ```
 
@@ -32,14 +66,14 @@ const jwtOptions = {
 ```javascript
 import { JwtManager } from '@igxjs/node-components';
 
-// Create instance with default configuration
+// Create instance with default configuration using constructor options (JWT_ prefix)
 const jwtManager = new JwtManager({
-  expirationTime: '1h',
-  issuer: 'my-app',
-  audience: 'my-users'
+  JWT_EXPIRATION_TIME: '1h',
+  JWT_ISSUER: 'my-app',
+  JWT_AUDIENCE: 'my-users'
 });
 
-// Encrypt user data
+// Encrypt user data - encrypt method uses camelCase for per-call options
 const userData = {
   userId: '12345',
   email: 'user@example.com',
@@ -47,11 +81,19 @@ const userData = {
 };
 
 const secret = 'your-secret-key';
+
+// Encrypt with default settings
 const token = await jwtManager.encrypt(userData, secret);
 
 console.log('Encrypted Token:', token);
 
-// Decrypt token
+// Encrypt with custom per-call options (camelCase)
+const shortExpiryToken = await jwtManager.encrypt(userData, secret, {
+  expirationTime: '1m',        // Override default expiration time
+  issuer: 'temporary-issuer'    // Temporary issuer for this token
+});
+
+// Decrypt token - decrypt method uses camelCase for per-call options
 try {
   const result = await jwtManager.decrypt(token, secret);
   console.log('Decrypted Payload:', result.payload);
@@ -59,6 +101,12 @@ try {
 } catch (error) {
   console.error('Token validation failed:', error);
 }
+
+// Decrypt with custom options (camelCase)
+const decryptedResult = await jwtManager.decrypt(token, secret, {
+  clockTolerance: 60,          // Extended clock tolerance
+  issuer: 'my-app'             // Validate against specific issuer
+});
 ```
 
 ## API Reference
@@ -67,10 +115,10 @@ try {
 
 **`new JwtManager(options?)`**
 
-Create a new JwtManager instance. All options are optional with sensible defaults.
+Create a new JwtManager instance. All options are optional with sensible defaults. Constructor options use UPPERCASE naming convention with JWT_ prefix.
 
 **Parameters:**
-- `options` (JwtManagerOptions, optional) - Configuration options
+- `options` (JwtManagerOptions, optional) - Configuration options using JWT_ prefixed properties
 
 ### Methods
 
@@ -81,7 +129,7 @@ Generate an encrypted JWT token.
 **Parameters:**
 - `data` (JWTPayload) - User data payload to encrypt
 - `input` (string) - Secret key or password for encryption
-- `options` (JwtEncryptOptions, optional) - Per-call configuration overrides
+- `options` (JwtEncryptOptions, optional) - Per-call configuration overrides using camelCase properties
 
 **Returns:** `Promise<string>` - Encrypted JWT token
 
@@ -92,7 +140,7 @@ Decrypt and validate a JWT token.
 **Parameters:**
 - `token` (string) - JWT token to decrypt
 - `input` (string) - Secret key or password for decryption
-- `options` (JwtDecryptOptions, optional) - Per-call configuration overrides
+- `options` (JwtDecryptOptions, optional) - Per-call configuration overrides using camelCase properties
 
 **Returns:** `Promise<JWTDecryptResult>` - Object containing `payload` and `protectedHeader`
 

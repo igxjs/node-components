@@ -141,6 +141,12 @@ const _getErrorMessage = (error, defaultMessage) => {
 };
 
 export const httpHelper = {
+  /**
+   * Format a string with placeholders
+   * @param {string} str String with {0}, {1}, etc. placeholders
+   * @param {...string} args Values to replace placeholders
+   * @returns {string} Formatted string
+   */
   format (str, ...args) {
     const matched = str.match(/{\d}/ig);
     matched.forEach((element, index) => {

@@ -26,16 +26,16 @@ describe('JwtManager', () => {
       expect(manager.secretHashAlgorithm).to.equal('SHA-256');
     });
 
-    it('should create JwtManager instance with custom options', () => {
+    it('should create JwtManager instance with custom options (JWT_ prefix)', () => {
       const options = {
-        algorithm: 'A128KW',
-        encryption: 'A128GCM',
-        expirationTime: '1h',
-        clockTolerance: 60,
-        secretHashAlgorithm: 'SHA-512',
-        issuer: 'test-issuer',
-        audience: 'test-audience',
-        subject: 'test-subject'
+        JWT_ALGORITHM: 'A128KW',
+        JWT_ENCRYPTION: 'A128GCM',
+        JWT_EXPIRATION_TIME: '1h',
+        JWT_CLOCK_TOLERANCE: 60,
+        JWT_SECRET_HASH_ALGORITHM: 'SHA-512',
+        JWT_ISSUER: 'test-issuer',
+        JWT_AUDIENCE: 'test-audience',
+        JWT_SUBJECT: 'test-subject'
       };
       const manager = new JwtManager(options);
       expect(manager.algorithm).to.equal('A128KW');
@@ -49,7 +49,7 @@ describe('JwtManager', () => {
     });
 
     it('should handle clockTolerance of 0', () => {
-      const manager = new JwtManager({ clockTolerance: 0 });
+      const manager = new JwtManager({ JWT_CLOCK_TOLERANCE: 0 });
       expect(manager.clockTolerance).to.equal(0);
     });
   });
@@ -61,7 +61,7 @@ describe('JwtManager', () => {
       expect(token.split('.').length).to.equal(5); // JWE has 5 parts
     });
 
-    it('should encrypt with custom encryption method', async () => {
+    it('should encrypt with custom encryption method (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         algorithm: 'dir',
         encryption: 'A256GCM'
@@ -69,35 +69,35 @@ describe('JwtManager', () => {
       expect(token).to.be.a('string');
     });
 
-    it('should encrypt with custom expiration time', async () => {
+    it('should encrypt with custom expiration time (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         expirationTime: '1h'
       });
       expect(token).to.be.a('string');
     });
 
-    it('should encrypt with issuer claim', async () => {
+    it('should encrypt with issuer claim (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         issuer: 'test-issuer'
       });
       expect(token).to.be.a('string');
     });
 
-    it('should encrypt with audience claim', async () => {
+    it('should encrypt with audience claim (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         audience: 'test-audience'
       });
       expect(token).to.be.a('string');
     });
 
-    it('should encrypt with subject claim', async () => {
+    it('should encrypt with subject claim (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         subject: 'test-subject'
       });
       expect(token).to.be.a('string');
     });
 
-    it('should encrypt with all optional claims', async () => {
+    it('should encrypt with all optional claims (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         issuer: 'test-issuer',
         audience: 'test-audience',
@@ -108,8 +108,8 @@ describe('JwtManager', () => {
 
     it('should use default claims from constructor if not overridden', async () => {
       const manager = new JwtManager({
-        issuer: 'default-issuer',
-        audience: 'default-audience'
+        JWT_ISSUER: 'default-issuer',
+        JWT_AUDIENCE: 'default-audience'
       });
       const token = await manager.encrypt(testData, testSecret);
       expect(token).to.be.a('string');
@@ -154,7 +154,7 @@ describe('JwtManager', () => {
       }
     });
 
-    it('should decrypt token with custom clock tolerance', async () => {
+    it('should decrypt token with custom clock tolerance (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         expirationTime: '1s'
       });
@@ -167,11 +167,11 @@ describe('JwtManager', () => {
       expect(result.payload).to.include(testData);
     });
 
-    it('should validate issuer claim when provided', async () => {
+    it('should validate issuer claim when provided (camelCase)', async () => {
       const issuer = 'test-issuer';
-      const token = await jwtManager.encrypt(testData, testSecret, { issuer });
+      const token = await jwtManager.encrypt(testData, testSecret, { issuer: issuer });
       
-      const result = await jwtManager.decrypt(token, testSecret, { issuer });
+      const result = await jwtManager.decrypt(token, testSecret, { issuer: issuer });
       expect(result.payload.iss).to.equal(issuer);
     });
 
@@ -190,11 +190,11 @@ describe('JwtManager', () => {
       }
     });
 
-    it('should validate audience claim when provided', async () => {
+    it('should validate audience claim when provided (camelCase)', async () => {
       const audience = 'test-audience';
-      const token = await jwtManager.encrypt(testData, testSecret, { audience });
+      const token = await jwtManager.encrypt(testData, testSecret, { audience: audience });
       
-      const result = await jwtManager.decrypt(token, testSecret, { audience });
+      const result = await jwtManager.decrypt(token, testSecret, { audience: audience });
       expect(result.payload.aud).to.equal(audience);
     });
 
@@ -213,11 +213,11 @@ describe('JwtManager', () => {
       }
     });
 
-    it('should validate subject claim when provided', async () => {
+    it('should validate subject claim when provided (camelCase)', async () => {
       const subject = 'test-subject';
-      const token = await jwtManager.encrypt(testData, testSecret, { subject });
+      const token = await jwtManager.encrypt(testData, testSecret, { subject: subject });
       
-      const result = await jwtManager.decrypt(token, testSecret, { subject });
+      const result = await jwtManager.decrypt(token, testSecret, { subject: subject });
       expect(result.payload.sub).to.equal(subject);
     });
 
@@ -238,9 +238,9 @@ describe('JwtManager', () => {
 
     it('should use default claims from constructor for validation', async () => {
       const manager = new JwtManager({
-        issuer: 'default-issuer',
-        audience: 'default-audience',
-        subject: 'default-subject'
+        JWT_ISSUER: 'default-issuer',
+        JWT_AUDIENCE: 'default-audience',
+        JWT_SUBJECT: 'default-subject'
       });
       
       const token = await manager.encrypt(testData, testSecret);
@@ -270,8 +270,8 @@ describe('JwtManager', () => {
 
     it('should handle SHA-256 hash algorithm', async () => {
       const manager = new JwtManager({ 
-        secretHashAlgorithm: 'SHA-256',
-        encryption: 'A256GCM' // SHA-256 produces 256 bits, matches A256GCM
+        JWT_SECRET_HASH_ALGORITHM: 'SHA-256',
+        JWT_ENCRYPTION: 'A256GCM' // SHA-256 produces 256 bits, matches A256GCM
       });
       
       const token = await manager.encrypt(testData, testSecret);

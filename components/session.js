@@ -2,13 +2,15 @@ import axios from 'axios';
 import session from 'express-session';
 import memStore from 'memorystore';
 import { RedisStore } from 'connect-redis';
-import { jwtDecrypt } from 'jose';
 
 import { CustomError, httpCodes, httpHelper, httpMessages } from './http-handlers.js';
+import { JwtManager } from './jwt.js';
 import { RedisManager } from './redis.js';
 
-const MemoryStore = memStore(session);
-
+/**
+ * Session configuration options
+ * Uses strict UPPERCASE naming convention for all property names
+ */
 export class SessionConfig {
   /** @type {string} */
   SSO_ENDPOINT_URL;
@@ -34,6 +36,23 @@ export class SessionConfig {
   REDIS_URL;
   /** @type {string} */
   REDIS_CERT_PATH;
+
+  /** @type {string} */
+  JWT_ALGORITHM;
+  /** @type {string} */
+  JWT_ENCRYPTION;
+  /** @type {string} */
+  JWT_EXPIRATION_TIME;
+  /** @type {number} */
+  JWT_CLOCK_TOLERANCE;
+  /** @type {string} */
+  JWT_SECRET_HASH_ALGORITHM;
+  /** @type {string} */
+  JWT_ISSUER;
+  /** @type {string} */
+  JWT_AUDIENCE;
+  /** @type {string} */
+  JWT_SUBJECT;
 }
 
 export class SessionManager {
@@ -45,6 +64,8 @@ export class SessionManager {
   #redisManager = null;
   /** @type {import('axios').AxiosInstance} */
   #idpRequest = null;
+  /** @type {import('./jwt.js').JwtManager} */
+  #jwtManager = null;
 
   /**
    * Create a new session manager
@@ -66,6 +87,15 @@ export class SessionManager {
       // Redis
       REDIS_URL: config.REDIS_URL,
       REDIS_CERT_PATH: config.REDIS_CERT_PATH,
+      // JWT Manager
+      JWT_ALGORITHM: config.JWT_ALGORITHM || 'dir',
+      JWT_ENCRYPTION: config.JWT_ENCRYPTION || 'A256GCM',
+      JWT_EXPIRATION_TIME: config.JWT_EXPIRATION_TIME || '10m',
+      JWT_CLOCK_TOLERANCE: config.JWT_CLOCK_TOLERANCE ?? 30,
+      JWT_SECRET_HASH_ALGORITHM: config.JWT_SECRET_HASH_ALGORITHM || 'SHA-256',
+      JWT_ISSUER: config.JWT_ISSUER,
+      JWT_AUDIENCE: config.JWT_AUDIENCE,
+      JWT_SUBJECT: config.JWT_SUBJECT,
     };
   }
 
@@ -126,6 +156,7 @@ export class SessionManager {
    */
   async setup(app, updateUser) {
     this.#redisManager = new RedisManager();
+    this.#jwtManager = new JwtManager(this.#config);
     // Identity Provider Request
     this.#idpRequest = axios.create({
       baseURL: this.#config.SSO_ENDPOINT_URL,
@@ -158,6 +189,7 @@ export class SessionManager {
   #memorySession() {
     // Memory Session
     console.log('### Using Memory as the Session Store ###');
+    const MemoryStore = memStore(session);
     return session({
       cookie: { maxAge: this.#config.SESSION_AGE, path: this.#config.SESSION_COOKIE_PATH, sameSite: false },
       store: new MemoryStore({}),
@@ -221,7 +253,7 @@ export class SessionManager {
    */
   #saveSession = async (request, jwt, initUser) => {
     /** @type {{ payload: { user: import('../models/types/user').UserModel, redirect_url: string } }} */
-    const { payload } = await this.#decryptJWT(jwt, this.#config.SSO_CLIENT_SECRET);
+    const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
     if (payload?.user) {
       console.debug('### CALLBACK USER ###');
       request.session[this.#getSessionKey()] = initUser(payload.user);
@@ -364,19 +396,5 @@ export class SessionManager {
       console.info('### LOGOUT SUCCESSFULLY ###');
       return callback(null);
     });
-  }
-
-  /**
-   * Decrypt JWT data for user session
-   * @param {string} data JWT data
-   * @param {string} input Input string for encryption
-   * @returns {Promise<import('jose').JWTDecryptResult<import('jose').EncryptJWT>>} Returns decrypted JWT payload
-   */
-  async #decryptJWT(data, input) {
-    const secret = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(input)
-    );
-    return await jwtDecrypt(data, new Uint8Array(secret), { clockTolerance: 30 });
   }
 }

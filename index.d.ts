@@ -5,8 +5,9 @@ import { EncryptJWT, JWTDecryptResult, JWTPayload } from 'jose';
 import { RedisClientType } from '@redis/client';
 import { Application, RequestHandler, Request, Response, NextFunction, Router } from 'express';
 
-// Session Configuration
+// Session Configuration - uses strict UPPERCASE naming convention for all property names
 export interface SessionConfig {
+  /** Identity Provider */
   SSO_ENDPOINT_URL?: string;
   SSO_CLIENT_ID?: string;
   SSO_CLIENT_SECRET?: string;
@@ -58,7 +59,7 @@ export interface SessionUser {
 export class SessionManager {
   /**
    * Constructor
-   * @param config - Session configuration
+   * @param config - Session configuration (uses strict UPPERCASE property names)
    */
   constructor(config: SessionConfig);
 
@@ -187,7 +188,7 @@ export class RedisManager {
 
   /**
    * Determine if the Redis server is connected
-   * @returns Returns true if Redis server is connected
+   * @returns Returns true if the Redis server is connected
    */
   isConnected(): Promise<boolean>;
 
@@ -198,57 +199,80 @@ export class RedisManager {
   disConnect(): Promise<void>;
 }
 
-// JWT Manager Configuration
+// JWT Manager Configuration - uses strict UPPERCASE naming convention with JWT_ prefix for all property names
 export interface JwtManagerOptions {
-  /** @type {string} JWE algorithm (default: 'dir') */
-  algorithm?: string;
-  /** @type {string} JWE encryption method (default: 'A256GCM') */
-  encryption?: string;
-  /** @type {string} Token expiration time (default: '10m') */
-  expirationTime?: string;
-  /** @type {number} Clock tolerance in seconds for token validation (default: 30) */
-  clockTolerance?: number;
-  /** @type {string} Hash algorithm for secret derivation (default: 'SHA-256') */
-  secretHashAlgorithm?: string;
-  /** @type {string} Optional JWT issuer claim */
-  issuer?: string;
-  /** @type {string} Optional JWT audience claim */
-  audience?: string;
-  /** @type {string} Optional JWT subject claim */
-  subject?: string;
+  /** JWE algorithm (default: 'dir') */
+  JWT_ALGORITHM?: string;
+  
+  /** JWE encryption method (default: 'A256GCM') */
+  JWT_ENCRYPTION?: string;
+  
+  /** Token expiration time (default: '10m') */
+  JWT_EXPIRATION_TIME?: string;
+  
+  /** Clock tolerance in seconds for token validation (default: 30) */
+  JWT_CLOCK_TOLERANCE?: number;
+  
+  /** Hash algorithm for secret derivation (default: 'SHA-256') */
+  JWT_SECRET_HASH_ALGORITHM?: string;
+  
+  /** Optional JWT issuer claim */
+  JWT_ISSUER?: string;
+  
+  /** Optional JWT audience claim */
+  JWT_AUDIENCE?: string;
+  
+  /** Optional JWT subject claim */
+  JWT_SUBJECT?: string;
 }
 
+/**
+ * Options for encrypt() method - uses camelCase naming convention
+ */
 export interface JwtEncryptOptions {
-  /** @type {string} Override default algorithm */
+  /** Override default algorithm */
   algorithm?: string;
-  /** @type {string} Override default encryption method */
+
+  /** Override default encryption method */
   encryption?: string;
-  /** @type {string} Override default expiration time */
+
+  /** Override default expiration time */
   expirationTime?: string;
-  /** @type {string} Override default hash algorithm */
+
+  /** Override default hash algorithm */
   secretHashAlgorithm?: string;
-  /** @type {string} Override default issuer claim */
+
+  /** Override default issuer claim */
   issuer?: string;
-  /** @type {string} Override default audience claim */
+
+  /** Override default audience claim */
   audience?: string;
-  /** @type {string} Override default subject claim */
+
+  /** Override default subject claim */
   subject?: string;
 }
 
+/**
+ * Options for decrypt() method - uses camelCase naming convention
+ */
 export interface JwtDecryptOptions {
-  /** @type {number} Override default clock tolerance */
+  /** Override default clock tolerance */
   clockTolerance?: number;
-  /** @type {string} Override default hash algorithm */
+
+  /** Override default hash algorithm */
   secretHashAlgorithm?: string;
-  /** @type {string} Expected issuer claim for validation */
+
+  /** Expected issuer claim for validation */
   issuer?: string;
-  /** @type {string} Expected audience claim for validation */
+
+  /** Expected audience claim for validation */
   audience?: string;
-  /** @type {string} Expected subject claim for validation */
+
+  /** Expected subject claim for validation */
   subject?: string;
 }
 
-export type DecryptedJWT = JWTDecryptResult<EncryptJWT>;
+export type JwtDecryptResult = JWTDecryptResult<EncryptJWT>;
 // JwtManager class for JWT encryption and decryption
 export class JwtManager {
   algorithm: string;
@@ -262,7 +286,7 @@ export class JwtManager {
 
   /**
    * Create a new JwtManager instance with configurable defaults
-   * @param options Configuration options
+   * @param options Configuration options (uses strict UPPERCASE with JWT_ prefix property names)
    */
   constructor(options?: JwtManagerOptions);
 
@@ -270,7 +294,7 @@ export class JwtManager {
    * Generate JWT token for user session
    * @param data User data payload
    * @param input Secret key or password for encryption
-   * @param options Per-call configuration overrides
+   * @param options Per-call configuration overrides (uses strict UPPERCASE with JWT_ prefix property names)
    * @returns Returns encrypted JWT token
    */
   encrypt(data: JWTPayload, input: string, options?: JwtEncryptOptions): Promise<string>;
@@ -279,10 +303,10 @@ export class JwtManager {
    * Decrypt JWT token for user session
    * @param token JWT token to decrypt
    * @param input Secret key or password for decryption
-   * @param options Per-call configuration overrides
+   * @param options Per-call configuration overrides (uses strict UPPERCASE with JWT_ prefix property names)
    * @returns Returns decrypted JWT token
    */
-  decrypt(token: string, input: string, options?: JwtDecryptOptions): Promise<DecryptedJWT>;
+  decrypt(token: string, input: string, options?: JwtDecryptOptions): Promise<JwtDecryptResult>;
 }
 
 // HTTP status code keys (exposed for type safety)
