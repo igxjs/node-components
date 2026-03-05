@@ -1,7 +1,7 @@
 import 'express-session';
 
 import { AxiosError } from 'axios';
-import { EncryptJWT, JWTDecryptResult } from 'jose';
+import { EncryptJWT, JWTDecryptResult, JWTPayload } from 'jose';
 import { RedisClientType } from '@redis/client';
 import { Application, RequestHandler, Request, Response, NextFunction, Router } from 'express';
 
@@ -273,7 +273,7 @@ export class JwtManager {
    * @param options Per-call configuration overrides
    * @returns Returns encrypted JWT token
    */
-  encrypt( JWTPayload, input: string, options?: JwtEncryptOptions): Promise<string>;
+  encrypt(data: JWTPayload, input: string, options?: JwtEncryptOptions): Promise<string>;
 
   /**
    * Decrypt JWT token for user session
