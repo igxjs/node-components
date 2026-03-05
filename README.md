@@ -206,7 +206,173 @@ if (connected) {
 
 ---
 
-### 4. HTTP Handlers
+### 4. JWT Manager
+
+Provides JWT (JSON Web Token) encryption and decryption utilities using the `jose` library with JWE (JSON Web Encryption) for secure token management.
+
+#### Configuration Options
+
+```javascript
+// Example configuration object
+const jwtOptions = {
+  algorithm: 'dir',              // JWE algorithm (default: 'dir')
+  encryption: 'A256GCM',         // JWE encryption method (default: 'A256GCM')
+  expirationTime: '10m',         // Token expiration (default: '10m')
+  clockTolerance: 30,            // Clock tolerance in seconds (default: 30)
+  secretHashAlgorithm: 'SHA-256', // Hash algorithm for secret derivation (default: 'SHA-256')
+  issuer: 'your-app',            // Optional JWT issuer claim
+  audience: 'your-users',        // Optional JWT audience claim
+  subject: 'user-session'        // Optional JWT subject claim
+};
+```
+
+#### Usage Example
+
+```javascript
+import { JwtManager } from '@igxjs/node-components';
+
+// Create instance with default configuration
+const jwtManager = new JwtManager({
+  expirationTime: '1h',
+  issuer: 'my-app',
+  audience: 'my-users'
+});
+
+// Encrypt user data
+const userData = {
+  userId: '12345',
+  email: 'user@example.com',
+  roles: ['admin', 'user']
+};
+
+const secret = 'your-secret-key';
+const token = await jwtManager.encrypt(userData, secret);
+
+console.log('Encrypted Token:', token);
+
+// Decrypt token
+try {
+  const result = await jwtManager.decrypt(token, secret);
+  console.log('Decrypted Payload:', result.payload);
+  console.log('Protected Header:', result.protectedHeader);
+} catch (error) {
+  console.error('Token validation failed:', error);
+}
+
+// Override options per-call
+const shortLivedToken = await jwtManager.encrypt(
+  userData,
+  secret,
+  { expirationTime: '5m' }  // Override default expiration
+);
+
+// Decrypt with custom validation
+const validatedResult = await jwtManager.decrypt(
+  token,
+  secret,
+  {
+    clockTolerance: 60,  // Allow more clock skew
+    issuer: 'my-app',    // Validate issuer
+    audience: 'my-users' // Validate audience
+  }
+);
+```
+
+#### Advanced Usage with Express
+
+```javascript
+import express from 'express';
+import { JwtManager } from '@igxjs/node-components';
+
+const app = express();
+const jwt = new JwtManager({ expirationTime: '24h' });
+const SECRET = process.env.JWT_SECRET;
+
+// Login endpoint - create token
+app.post('/api/login', async (req, res, next) => {
+  try {
+    const { username, password } = req.body;
+    
+    // Verify credentials (your logic here)
+    const user = await verifyCredentials(username, password);
+    
+    // Create JWT token
+    const token = await jwt.encrypt({
+      sub: user.id,
+      email: user.email,
+      roles: user.roles
+    }, SECRET);
+    
+    res.json({ token });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Protected endpoint - verify token
+app.get('/api/profile', async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+    
+    // Decrypt and validate token
+    const { payload } = await jwt.decrypt(token, SECRET);
+    
+    res.json({ user: payload });
+  } catch (error) {
+    // Token expired or invalid
+    res.status(401).json({ error: 'Invalid or expired token' });
+  }
+});
+```
+
+#### API Methods
+
+**Constructor:**
+- **`new JwtManager(options?)`** - Create a new JwtManager instance
+  - `options` (JwtManagerOptions, optional) - Configuration options
+  - All options are optional and have sensible defaults
+
+**Methods:**
+- **`encrypt(data, input, options?)`** - Generate encrypted JWT token
+  - `data` (JWTPayload) - User data payload to encrypt
+  - `input` (string) - Secret key or password for encryption
+  - `options` (JwtEncryptOptions, optional) - Per-call configuration overrides
+  - Returns: `Promise<string>` - Encrypted JWT token
+
+- **`decrypt(token, input, options?)`** - Decrypt and validate JWT token
+  - `token` (string) - JWT token to decrypt
+  - `input` (string) - Secret key or password for decryption
+  - `options` (JwtDecryptOptions, optional) - Per-call configuration overrides
+  - Returns: `Promise<JWTDecryptResult>` - Object containing `payload` and `protectedHeader`
+
+#### Configuration Details
+
+**Algorithms:**
+- `'dir'` (default) - Direct encryption with shared symmetric key
+- `'A128KW'`, `'A192KW'`, `'A256KW'` - AES Key Wrap algorithms
+
+**Encryption Methods:**
+- `'A256GCM'` (default) - AES-GCM with 256-bit key
+- `'A128GCM'`, `'A192GCM'` - AES-GCM with 128/192-bit keys
+
+**Expiration Time Format:**
+- `'10m'` - 10 minutes
+- `'1h'` - 1 hour
+- `'7d'` - 7 days
+- `'30s'` - 30 seconds
+
+**JWT Claims:**
+- `issuer` (iss) - Token issuer identification
+- `audience` (aud) - Intended token recipient
+- `subject` (sub) - Token subject (usually user ID)
+
+---
+
+### 5. HTTP Handlers
 
 Custom error handling utilities with standardized HTTP status codes and error responses.
 
@@ -215,7 +381,9 @@ Custom error handling utilities with standardized HTTP status codes and error re
 ```javascript
 import { 
   CustomError, 
-  httpErrorHandler, 
+  httpError,
+  httpErrorHandler,
+  httpNotFoundHandler,
   httpCodes, 
   httpMessages,
   httpHelper 
@@ -227,11 +395,22 @@ import {
 **Creating Custom Errors:**
 
 ```javascript
-// Basic custom error
+// Using CustomError class
 throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid input data');
+
+// Using httpError helper function (alias for new CustomError)
+throw httpError(httpCodes.BAD_REQUEST, 'Invalid input data');
 
 // With error details and additional data
 throw new CustomError(
+  httpCodes.UNAUTHORIZED,
+  'Authentication failed',
+  { originalError: err },
+  { attemptedEmail: email }
+);
+
+// Using httpError with additional data
+throw httpError(
   httpCodes.UNAUTHORIZED,
   'Authentication failed',
   { originalError: err },
@@ -265,7 +444,7 @@ app.get('/api/data', async (req, res, next) => {
 
 ```javascript
 import express from 'express';
-import { httpErrorHandler } from '@igxjs/node-components';
+import { httpErrorHandler, httpNotFoundHandler } from '@igxjs/node-components';
 
 const app = express();
 
@@ -277,6 +456,9 @@ app.get('/api/data', async (req, res, next) => {
     next(error);
   }
 });
+
+// Add 404 handler before error handler
+app.use(httpNotFoundHandler);
 
 // Add error handler as the last middleware
 app.use(httpErrorHandler);
@@ -320,6 +502,35 @@ httpMessages.BAD_REQUEST   // 'Bad Request'
 - **`error`** - Original error object (if provided)
 - **`data`** - Additional error data (if provided)
 
+#### httpError API
+
+**Function:**
+- **`httpError(code, message, error?, data?)`** - Convenience function to create CustomError instances
+  - `code` (number) - HTTP status code
+  - `message` (string) - Error message
+  - `error` (object, optional) - Original error object
+  - `data` (object, optional) - Additional error data
+  - Returns: `CustomError` instance
+  - **Note:** This is an alias for `new CustomError()` - use whichever syntax you prefer
+
+#### httpErrorHandler API
+
+**Middleware Function:**
+- **`httpErrorHandler(err, req, res, next)`** - Express error handling middleware
+  - Handles `CustomError` instances and other errors
+  - Sets appropriate HTTP status codes and response format
+  - Adds CORS headers automatically
+  - Logs error details to console
+  - **Usage:** Add as the last middleware in your Express app
+
+#### httpNotFoundHandler API
+
+**Middleware Function:**
+- **`httpNotFoundHandler(req, res, next)`** - Express 404 handler middleware
+  - Catches all unmatched routes and returns 404 error
+  - Creates a `CustomError` with NOT_FOUND status
+  - **Usage:** Add before the error handler middleware
+
 #### httpHelper API
 
 The `httpHelper` object provides utility methods for error handling:
@@ -345,6 +556,7 @@ The `httpHelper` object provides utility methods for error handling:
 ## Features
 
 - ✅ **Session Management** - Full SSO integration with Redis or memory storage
+- ✅ **JWT Manager** - Secure JWT encryption/decryption with JWE using the jose library
 - ✅ **Flexible Routing** - Easy mounting of routers with context paths and middleware
 - ✅ **Redis Integration** - Robust Redis connection management with TLS support
 - ✅ **Error Handling** - Standardized error responses and HTTP status codes
@@ -368,6 +580,10 @@ import type {
   SessionManager,
   SessionUser,
   SessionUserAttributes,
+  JwtManager,
+  JwtManagerOptions,
+  JwtEncryptOptions,
+  JwtDecryptOptions,
   FlexRouter,
   RedisManager,
   CustomError 

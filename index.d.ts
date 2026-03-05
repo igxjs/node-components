@@ -1,6 +1,7 @@
 import 'express-session';
 
 import { AxiosError } from 'axios';
+import { JWTPayload, JWTDecryptResult } from 'jose';
 import { RedisClientType } from '@redis/client';
 import { Application, RequestHandler, Request, Response, NextFunction, Router } from 'express';
 
@@ -197,6 +198,92 @@ export class RedisManager {
   disConnect(): Promise<void>;
 }
 
+// JWT Manager Configuration
+export interface JwtManagerOptions {
+  /** @type {string} JWE algorithm (default: 'dir') */
+  algorithm?: string;
+  /** @type {string} JWE encryption method (default: 'A256GCM') */
+  encryption?: string;
+  /** @type {string} Token expiration time (default: '10m') */
+  expirationTime?: string;
+  /** @type {number} Clock tolerance in seconds for token validation (default: 30) */
+  clockTolerance?: number;
+  /** @type {string} Hash algorithm for secret derivation (default: 'SHA-256') */
+  secretHashAlgorithm?: string;
+  /** @type {string} Optional JWT issuer claim */
+  issuer?: string;
+  /** @type {string} Optional JWT audience claim */
+  audience?: string;
+  /** @type {string} Optional JWT subject claim */
+  subject?: string;
+}
+
+export interface JwtEncryptOptions {
+  /** @type {string} Override default algorithm */
+  algorithm?: string;
+  /** @type {string} Override default encryption method */
+  encryption?: string;
+  /** @type {string} Override default expiration time */
+  expirationTime?: string;
+  /** @type {string} Override default hash algorithm */
+  secretHashAlgorithm?: string;
+  /** @type {string} Override default issuer claim */
+  issuer?: string;
+  /** @type {string} Override default audience claim */
+  audience?: string;
+  /** @type {string} Override default subject claim */
+  subject?: string;
+}
+
+export interface JwtDecryptOptions {
+  /** @type {number} Override default clock tolerance */
+  clockTolerance?: number;
+  /** @type {string} Override default hash algorithm */
+  secretHashAlgorithm?: string;
+  /** @type {string} Expected issuer claim for validation */
+  issuer?: string;
+  /** @type {string} Expected audience claim for validation */
+  audience?: string;
+  /** @type {string} Expected subject claim for validation */
+  subject?: string;
+}
+
+// JwtManager class for JWT encryption and decryption
+export class JwtManager {
+  algorithm: string;
+  encryption: string;
+  expirationTime: string;
+  clockTolerance: number;
+  secretHashAlgorithm: string;
+  issuer?: string;
+  audience?: string;
+  subject?: string;
+
+  /**
+   * Create a new JwtManager instance with configurable defaults
+   * @param options Configuration options
+   */
+  constructor(options?: JwtManagerOptions);
+
+  /**
+   * Generate JWT token for user session
+   * @param data User data payload
+   * @param input Secret key or password for encryption
+   * @param options Per-call configuration overrides
+   * @returns Returns encrypted JWT token
+   */
+  encrypt( JWTPayload, input: string, options?: JwtEncryptOptions): Promise<string>;
+
+  /**
+   * Decrypt JWT token for user session
+   * @param token JWT token to decrypt
+   * @param input Secret key or password for decryption
+   * @param options Per-call configuration overrides
+   * @returns Returns decrypted JWT token
+   */
+  decrypt(token: string, input: string, options?: JwtDecryptOptions): Promise<JWTDecryptResult>;
+}
+
 // HTTP status code keys (exposed for type safety)
 export const httpCodes: {
   OK: number;
@@ -254,6 +341,21 @@ export const httpHelper: {
    */
   handleAxiosError(error: Error | AxiosError, defaultMessage?: string): CustomError;
 };
+
+/**
+ * HTTP Error - alias of `new CustomError()`
+ * @param code Error code
+ * @param message Error message
+ * @param error Original Error instance
+ * @param data Error data
+ * @returns Returns a new instance of CustomError
+ */
+export function httpError(
+  code: number,
+  message: string,
+  error?: object,
+  data?: object
+): CustomError;
 
 /**
  * Custom error handler middleware
