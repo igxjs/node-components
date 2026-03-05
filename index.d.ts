@@ -295,6 +295,7 @@ export const httpCodes: {
   NOT_FOUND: number;
   NOT_ACCEPTABLE: number;
   CONFLICT: number;
+  LOCKED: number;
   SYSTEM_FAILURE: number;
   NOT_IMPLEMENTED: number;
 };
@@ -310,6 +311,7 @@ export const httpMessages: {
   NOT_FOUND: string;
   NOT_ACCEPTABLE: string;
   CONFLICT: string;
+  LOCKED: string;
   SYSTEM_FAILURE: string;
   NOT_IMPLEMENTED: string;
 };

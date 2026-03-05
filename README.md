@@ -466,24 +466,22 @@ app.use(httpErrorHandler);
 
 #### HTTP Codes & Messages
 
-```javascript
-httpCodes.OK               // 200
-httpCodes.CREATED          // 201
-httpCodes.NO_CONTENT       // 204
-httpCodes.BAD_REQUEST      // 400
-httpCodes.UNAUTHORIZED     // 401
-httpCodes.FORBIDDEN        // 403
-httpCodes.NOT_FOUND        // 404
-httpCodes.NOT_ACCEPTABLE   // 406
-httpCodes.CONFLICT         // 409
-httpCodes.SYSTEM_FAILURE   // 500
-httpCodes.NOT_IMPLEMENTED  // 501
+**Available Status Codes:**
+- `httpCodes.OK` (200)
+- `httpCodes.CREATED` (201)
+- `httpCodes.NO_CONTENT` (204)
+- `httpCodes.BAD_REQUEST` (400)
+- `httpCodes.UNAUTHORIZED` (401)
+- `httpCodes.FORBIDDEN` (403)
+- `httpCodes.NOT_FOUND` (404)
+- `httpCodes.NOT_ACCEPTABLE` (406)
+- `httpCodes.CONFLICT` (409)
+- `httpCodes.LOCKED` (423)
+- `httpCodes.SYSTEM_FAILURE` (500)
+- `httpCodes.NOT_IMPLEMENTED` (501)
 
-// Corresponding messages
-httpMessages.OK            // 'OK'
-httpMessages.BAD_REQUEST   // 'Bad Request'
-// ... etc
-```
+**Available Status Messages:**
+- Corresponding `httpMessages` constants are available for each status code (e.g., `httpMessages.OK`, `httpMessages.BAD_REQUEST`, etc.)
 
 #### CustomError API
 
