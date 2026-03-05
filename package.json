@@ -1,6 +1,6 @@
 {
   "name": "@igxjs/node-components",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Node components for igxjs",
   "main": "index.js",
   "type": "module",

@@ -27,7 +27,7 @@ export class JwtManager {
   /**
    * Generate JWT token for user session
    * @param {import('jose').JWTPayload} data User data payload
-   * @param {string} input Secret key or password for encryption
+   * @param {string} secret Secret key or password for encryption
    * @param {Object} [options] Per-call configuration overrides
    * @param {string} [options.algorithm] Override default algorithm
    * @param {string} [options.encryption] Override default encryption method
@@ -38,7 +38,7 @@ export class JwtManager {
    * @param {string} [options.subject] Override default subject claim
    * @returns {Promise<string>} Returns encrypted JWT token
    */
-  async encrypt(data, input, options = {}) {
+  async encrypt(data, secret, options = {}) {
     const algorithm = options.algorithm || this.algorithm;
     const encryption = options.encryption || this.encryption;
     const expirationTime = options.expirationTime || this.expirationTime;
@@ -47,9 +47,9 @@ export class JwtManager {
     const audience = options.audience || this.audience;
     const subject = options.subject || this.subject;
 
-    const secret = await crypto.subtle.digest(
+    const secretHash = await crypto.subtle.digest(
       secretHashAlgorithm,
-      new TextEncoder().encode(input)
+      new TextEncoder().encode(secret)
     );
 
     const jwt = new EncryptJWT(data)
@@ -65,13 +65,13 @@ export class JwtManager {
     if (audience) jwt.setAudience(audience);
     if (subject) jwt.setSubject(subject);
 
-    return await jwt.encrypt(new Uint8Array(secret));
+    return await jwt.encrypt(new Uint8Array(secretHash));
   }
 
   /**
    * Decrypt JWT token for user session
    * @param {string} token JWT token to decrypt
-   * @param {string} input Secret key or password for decryption
+   * @param {string} secret Secret key or password for decryption
    * @param {Object} [options] Per-call configuration overrides
    * @param {number} [options.clockTolerance] Override default clock tolerance
    * @param {string} [options.secretHashAlgorithm] Override default hash algorithm
@@ -80,16 +80,16 @@ export class JwtManager {
    * @param {string} [options.subject] Expected subject claim for validation
    * @returns {Promise<import('jose').JWTDecryptResult<import('jose').EncryptJWT>>} Returns decrypted JWT token
    */
-  async decrypt(token, input, options = {}) {
+  async decrypt(token, secret, options = {}) {
     const clockTolerance = options.clockTolerance ?? this.clockTolerance;
     const secretHashAlgorithm = options.secretHashAlgorithm || this.secretHashAlgorithm;
     const issuer = options.issuer || this.issuer;
     const audience = options.audience || this.audience;
     const subject = options.subject || this.subject;
 
-    const secret = await crypto.subtle.digest(
+    const secretHash = await crypto.subtle.digest(
       secretHashAlgorithm,
-      new TextEncoder().encode(input)
+      new TextEncoder().encode(secret)
     );
 
     const decryptOptions = { clockTolerance };
@@ -99,6 +99,6 @@ export class JwtManager {
     if (audience) decryptOptions.audience = audience;
     if (subject) decryptOptions.subject = subject;
 
-    return await jwtDecrypt(token, new Uint8Array(secret), decryptOptions);
+    return await jwtDecrypt(token, new Uint8Array(secretHash), decryptOptions);
   }
 }
