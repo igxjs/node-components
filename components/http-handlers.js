@@ -10,6 +10,7 @@ export const httpMessages = {
   NOT_FOUND: 'Not Found',
   NOT_ACCEPTABLE: 'Not Acceptable',
   CONFLICT: 'Conflict',
+  LOCKED: 'Locked',
   SYSTEM_FAILURE: 'System Error',
   NOT_IMPLEMENTED: 'Not Implemented',
 };
@@ -17,13 +18,14 @@ export const httpMessages = {
 export const httpCodes = {
   OK: 200,
   CREATED: 201,
-  NO_CONTENT: 201,
+  NO_CONTENT: 204,
   BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   NOT_ACCEPTABLE: 406,
   CONFLICT: 409,
+  LOCKED: 423,
   SYSTEM_FAILURE: 500,
   NOT_IMPLEMENTED: 501,
 };
