@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import { jwtDecrypt, EncryptJWT } from 'jose';
 
 export class JwtManager {

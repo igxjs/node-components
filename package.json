@@ -1,6 +1,6 @@
 {
   "name": "@igxjs/node-components",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "Node components for igxjs",
   "main": "index.js",
   "type": "module",
@@ -36,6 +36,13 @@
     "sinon": "^21.0.2",
     "supertest": "^7.0.0"
   },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "components/",
+    "LICENSE",
+    "README.md"
+  ],
   "publishConfig": {
     "access": "public"
   },
