@@ -5,6 +5,14 @@ import { EncryptJWT, JWTDecryptResult, JWTPayload } from 'jose';
 import { RedisClientType } from '@redis/client';
 import { Application, RequestHandler, Request, Response, NextFunction, Router } from 'express';
 
+export { JWTPayload } from 'jose';
+
+// Session Mode constants
+export const SessionMode: {
+  SESSION: string;
+  TOKEN: string;
+};
+
 // Session Configuration - uses strict UPPERCASE naming convention for all property names
 export interface SessionConfig {
   /** Identity Provider */
@@ -14,6 +22,9 @@ export interface SessionConfig {
   SSO_SUCCESS_URL?: string;
   SSO_FAILURE_URL?: string;
 
+  /** Authentication mode: 'session' or 'token' (default: 'session') */
+  SESSION_MODE?: string;
+
   SESSION_AGE?: number;
   SESSION_COOKIE_PATH?: string;
   SESSION_SECRET?: string;
@@ -21,6 +32,15 @@ export interface SessionConfig {
 
   REDIS_URL?: string;
   REDIS_CERT_PATH?: string;
+
+  JWT_ALGORITHM?: string;
+  JWT_ENCRYPTION?: string;
+  JWT_EXPIRATION_TIME?: string;
+  JWT_CLOCK_TOLERANCE?: number;
+  JWT_SECRET_HASH_ALGORITHM?: string;
+  JWT_ISSUER?: string;
+  JWT_AUDIENCE?: string;
+  JWT_SUBJECT?: string;
 }
 
 export interface SessionUserAttributes {
@@ -98,7 +118,8 @@ export class SessionManager {
   ): Promise<void>;
 
   /**
-   * Resource protection middleware
+   * Resource protection middleware based on configured SESSION_MODE
+   * Uses verifySession() for SESSION mode and verifyToken() for TOKEN mode
    * @param isDebugging Debugging flag (default: false)
    * @param redirectUrl Redirect URL (default: '')
    * @returns Returns express Request Handler
@@ -106,7 +127,26 @@ export class SessionManager {
   authenticate(isDebugging?: boolean, redirectUrl?: string): RequestHandler;
 
   /**
+   * Resource protection by token (explicit token verification)
+   * Requires Authorization: Bearer {token} header
+   * @param isDebugging Debugging flag (default: false)
+   * @param redirectUrl Redirect URL (default: '')
+   * @returns Returns express Request Handler
+   */
+  verifyToken(isDebugging?: boolean, redirectUrl?: string): RequestHandler;
+
+  /**
+   * Resource protection by session (explicit session verification)
+   * @param isDebugging Debugging flag (default: false)
+   * @param redirectUrl Redirect URL (default: '')
+   * @returns Returns express Request Handler
+   */
+  verifySession(isDebugging?: boolean, redirectUrl?: string): RequestHandler;
+
+  /**
    * SSO callback for successful login
+   * SESSION mode: Saves session and redirects
+   * TOKEN mode: Generates JWT token, returns HTML page with localStorage script
    * @param initUser Initialize user object function
    * @returns Returns express Request Handler
    */
@@ -119,17 +159,22 @@ export class SessionManager {
   identityProviders(): RequestHandler;
 
   /**
-   * Application logout (NOT SSO)
-   * @returns Returns express Request Handler
-   */
-  logout(): RequestHandler;
-
-  /**
-   * Refresh user session
+   * Refresh user authentication based on configured SESSION_MODE
+   * SESSION mode: Refreshes session data
+   * TOKEN mode: Generates new token, invalidates old token
    * @param initUser Initialize user object function
    * @returns Returns express Request Handler
    */
   refresh(initUser: (user: SessionUser) => SessionUser): RequestHandler;
+
+  /**
+   * Application logout based on configured SESSION_MODE (NOT SSO)
+   * SESSION mode: Destroys session and clears cookie
+   * TOKEN mode: Invalidates current token or all tokens (with ?all=true query param)
+   * Query params: redirect=true (redirect to success/failure URL), all=true (logout all tokens - TOKEN mode only)
+   * @returns Returns express Request Handler
+   */
+  logout(): RequestHandler;
 }
 
 // Custom Error class
@@ -273,6 +318,7 @@ export interface JwtDecryptOptions {
 }
 
 export type JwtDecryptResult = JWTDecryptResult<EncryptJWT>;
+
 // JwtManager class for JWT encryption and decryption
 export class JwtManager {
   algorithm: string;

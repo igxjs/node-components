@@ -12,7 +12,7 @@ npm install @igxjs/node-components
 
 | Component | Description | Documentation |
 |-----------|-------------|---------------|
-| **SessionManager** | SSO session management with Redis/memory storage | [View docs](./docs/session-manager.md) |
+| **SessionManager** | SSO session management with Redis/memory storage, supporting both session and token-based authentication | [View docs](./docs/session-manager.md) |
 | **FlexRouter** | Flexible routing with context paths and middleware | [View docs](./docs/flex-router.md) |
 | **RedisManager** | Redis connection management with TLS support | [View docs](./docs/redis-manager.md) |
 | **JWT Manager** | Secure JWT encryption/decryption with JWE | [View docs](./docs/jwt-manager.md) |
@@ -23,15 +23,25 @@ npm install @igxjs/node-components
 ### SessionManager
 
 ```javascript
-import { SessionManager } from '@igxjs/node-components';
+import { SessionManager, SessionMode } from '@igxjs/node-components';
 
-// Create singleton instance
+// Create singleton instance with SESSION authentication (default)
 export const session = new SessionManager({
   SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
   SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
   SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET,
   SESSION_SECRET: process.env.SESSION_SECRET,
   REDIS_URL: process.env.REDIS_URL
+});
+
+// Create singleton instance with TOKEN authentication
+export const tokenSession = new SessionManager({
+  SESSION_MODE: SessionMode.TOKEN,  // Use token-based authentication
+  SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
+  SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
+  SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET,
+  SESSION_SECRET: process.env.SESSION_SECRET,
+  REDIS_URL: process.env.REDIS_URL,
 });
 
 // Setup in your app
@@ -105,9 +115,93 @@ app.use(httpErrorHandler);
 
 [📖 Full HTTP Handlers Documentation](./docs/http-handlers.md)
 
+## SessionManager Authentication Modes
+
+The `SessionManager` supports two authentication modes:
+
+### SESSION Mode (Default)
+
+Uses traditional server-side session cookies. When a user authenticates via SSO, their session is stored in Redis or memory storage. The client sends the session cookie with each request to prove authentication.
+
+**Configuration:**
+- `SESSION_MODE`: `SessionMode.SESSION` (default) - Uses session-based authentication
+- `SESSION_AGE`: Session timeout in milliseconds (default: 64800000)
+- `REDIS_URL`: Redis connection string for session storage
+
+**Auth Methods:**
+- `session.authenticate()` - Protect routes with SSO session verification
+- `session.verifySession(isDebugging, redirectUrl)` - Explicit session verification method
+- `session.logout(redirect?, all?)` - Logout current session (or logout all for token mode)
+
+### TOKEN Mode
+
+Uses JWT bearer tokens instead of session cookies. When a user authenticates via SSO, a JWT token is generated and stored in Redis. The client includes the token in the Authorization header (`Bearer {token}`) with each request.
+
+**Configuration:**
+- `SESSION_MODE`: `SessionMode.TOKEN` - Uses token-based authentication
+- `SSO_SUCCESS_URL`: Redirect URL after successful SSO login
+- `SSO_FAILURE_URL`: Redirect URL after failed SSO login  
+- `JWT_ALGORITHM`: JWT algorithm (default: `'dir'`)
+- `JWT_ENCRYPTION`: Encryption algorithm (default: `'A256GCM'`)
+- `JWT_EXPIRATION_TIME`: Token expiration time (default: `'10m'`)
+- `JWT_CLOCK_TOLERANCE`: Clock skew tolerance in seconds (default: 30)
+
+**Auth Methods:**
+- `session.verifyToken(isDebugging, redirectUrl)` - Protect routes with token verification
+- `session.callback(initUser)` - SSO callback handler for token generation
+- `session.refresh(initUser)` - Refresh user authentication based on auth mode
+- `session.logout(redirect?, all?)` - Logout current or all tokens
+
+**Token Storage (Client-Side):**
+
+When using token-based authentication, the client-side HTML page stores the token in `localStorage`:
+
+```html
+<script>
+  // Store auth data in localStorage
+  localStorage.setItem('authToken', ${JSON.stringify(token)});
+  localStorage.setItem('tokenExpiry', ${Date.now() + sessionAge});
+  localStorage.setItem('user', ${JSON.stringify({
+    email: user.email,
+    name: user.name,
+  })});
+  
+  // Redirect to original destination
+  window.location.replace(redirectUrl);
+</script>
+```
+
+## SessionManager Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `SSO_ENDPOINT_URL` | string | - | Identity provider endpoint URL |
+| `SSO_CLIENT_ID` | string | - | SSO client ID |
+| `SSO_CLIENT_SECRET` | string | - | SSO client secret |
+| `SSO_SUCCESS_URL` | string | - | Redirect URL after successful login (token mode) |
+| `SSO_FAILURE_URL` | string | - | Redirect URL after failed login (token mode) |
+| `SESSION_MODE` | string | `SessionMode.SESSION` | Authentication mode: `SessionMode.SESSION` or `SessionMode.TOKEN` |
+| `SESSION_AGE` | number | 64800000 | Session timeout in milliseconds |
+| `SESSION_COOKIE_PATH` | string | `'/'` | Session cookie path |
+| `SESSION_SECRET` | string | - | Session/JWT secret key |
+| `SESSION_PREFIX` | string | `'ibmid:'` | Redis session/key prefix |
+| `REDIS_URL` | string | - | Redis connection URL (optional) |
+| `REDIS_CERT_PATH` | string | - | Path to Redis TLS certificate |
+| `JWT_ALGORITHM` | string | `'dir'` | JWT signing algorithm |
+| `JWT_ENCRYPTION` | string | `'A256GCM'` | JWE encryption algorithm |
+| `JWT_EXPIRATION_TIME` | string | `'10m'` | Token expiration duration |
+| `JWT_CLOCK_TOLERANCE` | number | 30 | Clock skew tolerance in seconds |
+| `JWT_SECRET_HASH_ALGORITHM` | string | `'SHA-256'` | Algorithm for hashing secrets |
+| `JWT_ISSUER` | string | - | JWT issuer identifier |
+| `JWT_AUDIENCE` | string | - | JWT audience identifier |
+| `JWT_SUBJECT` | string | - | JWT subject identifier |
+
 ## Features
 
 - ✅ **SSO Integration** - Full SSO support with Redis or memory storage
+- ✅ **Dual Authentication Modes** - SESSION (cookies) or TOKEN (Bearer tokens)
+- ✅ **Token Refresh** - Automatic token refresh via SSO endpoints
+- ✅ **Session Refresh Locks** - Prevent concurrent token/session refresh attacks
 - ✅ **JWT Security** - Encrypted JWT tokens using JWE (jose library)
 - ✅ **Flexible Routing** - Easy mounting with context paths and middleware
 - ✅ **Redis Support** - TLS/SSL and automatic reconnection

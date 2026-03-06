@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import axios from 'axios';
 import session from 'express-session';
 import memStore from 'memorystore';
@@ -8,10 +9,24 @@ import { JwtManager } from './jwt.js';
 import { RedisManager } from './redis.js';
 
 /**
+ * Session authentication mode constants
+ */
+export const SessionMode = {
+  SESSION: 'session',
+  TOKEN: 'token'
+};
+
+/**
  * Session configuration options
- * Uses strict UPPERCASE naming convention for all property names
  */
 export class SessionConfig {
+  /** 
+   * @type {string} 
+   * Authentication mode for protected routes
+   * Supported values: SessionMode.SESSION | SessionMode.TOKEN
+   * @default SessionMode.SESSION
+   */
+  SESSION_MODE;
   /** @type {string} */
   SSO_ENDPOINT_URL;
   /** @type {string} */
@@ -73,6 +88,8 @@ export class SessionManager {
    */
   constructor(config) {
     this.#config = {
+      // Session Mode
+      SESSION_MODE: config.SESSION_MODE || SessionMode.SESSION,
       // Session
       SESSION_AGE: config.SESSION_AGE || 64800000,
       SESSION_COOKIE_PATH: config.SESSION_COOKIE_PATH || '/',
@@ -142,11 +159,394 @@ export class SessionManager {
   }
 
   /**
+   * Get Redis key for token storage
+   * @param {string} email User email
+   * @param {string} tokenId Token ID
+   * @returns {string} Returns the Redis key for token storage
+   * @private
+   */
+  #getTokenRedisKey(email, tokenId) {
+    return `${this.#config.SESSION_PREFIX}token:${email}:${tokenId}`;
+  }
+
+  /**
+   * Get Redis key pattern for all user tokens
+   * @param {string} email User email
+   * @returns {string} Returns the Redis key pattern for all user tokens
+   * @private
+   */
+  #getTokenRedisPattern(email) {
+    return `${this.#config.SESSION_PREFIX}token:${email}:*`;
+  }
+
+  /**
    * Get RedisManager instance
    * @returns {import('./redis.js').RedisManager} Returns the RedisManager instance
    */
   redisManager() {
     return this.#redisManager;
+  }
+
+  /**
+   * Generate and store JWT token in Redis
+   * @param {object} user User object
+   * @returns {Promise<string>} Returns the generated JWT token
+   * @private
+   */
+  async #generateAndStoreToken(user) {
+    // Generate unique token ID for this device/session
+    const tokenId = crypto.randomUUID();
+    
+    // Create JWT token with email and tokenId
+    const token = await this.#jwtManager.encrypt(
+      { 
+        email: user.email, 
+        tokenId 
+      },
+      this.#config.SESSION_SECRET,
+      { expirationTime: this.#config.JWT_EXPIRATION_TIME }
+    );
+    
+    // Store user data in Redis with TTL
+    const redisKey = this.#getTokenRedisKey(user.email, tokenId);
+    const ttlSeconds = Math.floor(this.#config.SESSION_AGE / 1000);
+    
+    await this.#redisManager.getClient().setEx(
+      redisKey,
+      ttlSeconds,
+      JSON.stringify(user)
+    );
+    
+    console.debug(`### TOKEN GENERATED: ${user.email} ###`);
+    
+    return token;
+  }
+
+  /**
+   * Verify token authentication
+   * @param {import('@types/express').Request} req Request
+   * @param {import('@types/express').Response} res Response
+   * @param {import('@types/express').NextFunction} next Next function
+   * @param {boolean} isDebugging Debugging flag
+   * @param {string} redirectUrl Redirect URL
+   * @private
+   */
+  async #verifyToken(req, res, next, isDebugging, redirectUrl) {
+    try {
+      // Extract token from Authorization header
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        throw new CustomError(httpCodes.UNAUTHORIZED, 'Missing or invalid authorization header');
+      }
+
+      const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+      // Decrypt JWT token
+      const { payload } = await this.#jwtManager.decrypt(
+        token,
+        this.#config.SESSION_SECRET
+      );
+
+      // Extract email and tokenId
+      const { email, tokenId } = payload;
+      if (!email || !tokenId) {
+        throw new CustomError(httpCodes.UNAUTHORIZED, 'Invalid token payload');
+      }
+
+      // Lookup user in Redis
+      const redisKey = this.#getTokenRedisKey(email, tokenId);
+      const userData = await this.#redisManager.getClient().get(redisKey);
+
+      if (!userData) {
+        throw new CustomError(httpCodes.UNAUTHORIZED, 'Token not found or expired');
+      }
+
+      // Parse and attach user to request
+      req.user = JSON.parse(userData);
+      res.locals.user = req.user;
+
+      // Validate authorization
+      const { authorized = isDebugging } = req.user ?? { authorized: isDebugging };
+      if (!authorized && !isDebugging) {
+        throw new CustomError(httpCodes.FORBIDDEN, 'User is not authorized');
+      }
+
+      return next();
+
+    } catch (error) {
+      if (isDebugging) {
+        console.warn('### TOKEN VERIFICATION FAILED (debugging mode) ###', error.message);
+        return next();
+      }
+
+      if (redirectUrl) {
+        return res.redirect(redirectUrl);
+      }
+
+      // Handle specific JWT errors
+      if (error.code === 'ERR_JWT_EXPIRED') {
+        return next(new CustomError(httpCodes.UNAUTHORIZED, 'Token expired'));
+      }
+
+      return next(error instanceof CustomError ? error : 
+        new CustomError(httpCodes.UNAUTHORIZED, 'Token verification failed'));
+    }
+  }
+
+  /**
+   * Verify session authentication
+   * @param {import('@types/express').Request} req Request
+   * @param {import('@types/express').Response} res Response
+   * @param {import('@types/express').NextFunction} next Next function
+   * @param {boolean} isDebugging Debugging flag
+   * @param {string} redirectUrl Redirect URL
+   * @private
+   */
+  async #verifySession(req, res, next, isDebugging, redirectUrl) {
+    const { authorized = isDebugging } = req.user ?? { authorized: isDebugging };
+    if (authorized) {
+      return next();
+    }
+    if (redirectUrl) {
+      return res.redirect(redirectUrl);
+    }
+    return next(new CustomError(httpCodes.UNAUTHORIZED, httpMessages.UNAUTHORIZED));
+  }
+
+  /**
+   * Refresh token authentication
+   * @param {import('@types/express').Request} req Request
+   * @param {import('@types/express').Response} res Response
+   * @param {import('@types/express').NextFunction} next Next function
+   * @param {(user: object) => object} initUser Initialize user function
+   * @param {string} idpUrl Identity provider URL
+   * @private
+   */
+  async #refreshToken(req, res, next, initUser, idpUrl) {
+    try {
+      // Get current user from verifyToken middleware
+      const { email, attributes } = req.user || {};
+
+      if (!email) {
+        throw new CustomError(httpCodes.UNAUTHORIZED, 'User not authenticated');
+      }
+
+      // Extract tokenId from current token
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.substring(7);
+      const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
+      const oldTokenId = payload.tokenId;
+
+      // Check refresh lock
+      if (this.hasLock(email)) {
+        throw new CustomError(httpCodes.CONFLICT, 'Token refresh is locked');
+      }
+      this.lock(email);
+
+      // Call SSO refresh endpoint
+      const response = await this.#idpRequest.post(idpUrl, {
+        user: {
+          email,
+          attributes: {
+            idp: attributes?.idp,
+            refresh_token: attributes?.refresh_token
+          }
+        }
+      });
+
+      if (response.status !== httpCodes.OK) {
+        throw new CustomError(response.status, response.statusText);
+      }
+
+      // Decrypt new user data from SSO
+      const { jwt } = response.data;
+      const { payload: newPayload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
+
+      if (!newPayload?.user) {
+        throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload from SSO');
+      }
+
+      // Initialize user with new data
+      const user = initUser(newPayload.user);
+
+      // Generate new token
+      const newToken = await this.#generateAndStoreToken(user);
+
+      // Remove old token from Redis
+      const oldRedisKey = this.#getTokenRedisKey(email, oldTokenId);
+      await this.#redisManager.getClient().del(oldRedisKey);
+
+      console.debug('### TOKEN REFRESHED SUCCESSFULLY ###');
+
+      // Return new token
+      return res.json({
+        token: newToken,
+        user,
+        expiresIn: Math.floor(this.#config.SESSION_AGE / 1000),
+        tokenType: 'Bearer'
+      });
+    } catch (error) {
+      return next(httpHelper.handleAxiosError(error));
+    }
+  }
+
+  /**
+   * Refresh session authentication
+   * @param {import('@types/express').Request} req Request
+   * @param {import('@types/express').Response} res Response
+   * @param {import('@types/express').NextFunction} next Next function
+   * @param {(user: object) => object} initUser Initialize user function
+   * @param {string} idpUrl Identity provider URL
+   * @private
+   */
+  async #refreshSession(req, res, next, initUser, idpUrl) {
+    try {
+      const { email, attributes } = req.user || { email: '', attributes: {} };
+      if (this.hasLock(email)) {
+        throw new CustomError(httpCodes.CONFLICT, 'User refresh is locked');
+      }
+      this.lock(email);
+      const response = await this.#idpRequest.post(idpUrl, {
+        user: {
+          email,
+          attributes: {
+            idp: attributes?.idp,
+            refresh_token: attributes?.refresh_token
+          }
+        }
+      });
+      if (response.status === httpCodes.OK) {
+        const { jwt } = response.data;
+        const payload = await this.#saveSession(req, jwt, initUser);
+        return res.json(payload);
+      }
+      throw new CustomError(response.status, response.statusText);
+    } catch (error) {
+      return next(httpHelper.handleAxiosError(error));
+    }
+  }
+
+  /**
+   * Logout all tokens for a user
+   * @param {import('@types/express').Request} req Request
+   * @param {import('@types/express').Response} res Response
+   * @param {boolean} isRedirect Whether to redirect
+   * @private
+   */
+  async #logoutAllTokens(req, res, isRedirect) {
+    try {
+      const { email } = req.user || {};
+
+      if (!email) {
+        throw new CustomError(httpCodes.UNAUTHORIZED, 'User not authenticated');
+      }
+
+      // Find all tokens for this user
+      const pattern = this.#getTokenRedisPattern(email);
+      const keys = await this.#redisManager.getClient().keys(pattern);
+
+      // Delete all tokens
+      if (keys.length > 0) {
+        await this.#redisManager.getClient().del(keys);
+      }
+
+      console.info(`### ALL TOKENS LOGGED OUT: ${email} (${keys.length} tokens) ###`);
+
+      if (isRedirect) {
+        return res.redirect(this.#config.SSO_SUCCESS_URL);
+      }
+      return res.json({ 
+        message: 'All tokens logged out successfully',
+        tokensRemoved: keys.length,
+        redirect_url: this.#config.SSO_SUCCESS_URL
+      });
+    } catch (error) {
+      console.error('### LOGOUT ALL TOKENS ERROR ###', error);
+      if (isRedirect) {
+        return res.redirect(this.#config.SSO_FAILURE_URL);
+      }
+      return res.status(httpCodes.SYSTEM_FAILURE).json({ 
+        error: 'Logout all failed',
+        redirect_url: this.#config.SSO_FAILURE_URL
+      });
+    }
+  }
+
+  /**
+   * Logout token authentication
+   * @param {import('@types/express').Request} req Request
+   * @param {import('@types/express').Response} res Response
+   * @param {boolean} isRedirect Whether to redirect
+   * @param {boolean} logoutAll Whether to logout all tokens
+   * @private
+   */
+  async #logoutToken(req, res, isRedirect, logoutAll = false) {
+    // If logoutAll is true, delegate to the all tokens logout method
+    if (logoutAll) {
+      return this.#logoutAllTokens(req, res, isRedirect);
+    }
+
+    try {
+      // Extract tokenId from current token
+      const authHeader = req.headers.authorization;
+      const token = authHeader?.substring(7);
+
+      if (!token) {
+        throw new CustomError(httpCodes.BAD_REQUEST, 'No token provided');
+      }
+
+      const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
+      const { email, tokenId } = payload;
+
+      // Remove token from Redis
+      const redisKey = this.#getTokenRedisKey(email, tokenId);
+      await this.#redisManager.getClient().del(redisKey);
+
+      console.info('### TOKEN LOGOUT SUCCESSFULLY ###');
+
+      if (isRedirect) {
+        return res.redirect(this.#config.SSO_SUCCESS_URL);
+      }
+      return res.json({ 
+        message: 'Logout successful',
+        redirect_url: this.#config.SSO_SUCCESS_URL
+      });
+
+    } catch (error) {
+      console.error('### TOKEN LOGOUT ERROR ###', error);
+      if (isRedirect) {
+        return res.redirect(this.#config.SSO_FAILURE_URL);
+      }
+      return res.status(httpCodes.SYSTEM_FAILURE).json({ 
+        error: 'Logout failed',
+        redirect_url: this.#config.SSO_FAILURE_URL
+      });
+    }
+  }
+
+  /**
+   * Logout session authentication
+   * @param {import('@types/express').Request} req Request
+   * @param {import('@types/express').Response} res Response
+   * @param {Function} callback Callback function
+   * @private
+   */
+  #logoutSession(req, res, callback) {
+    try {
+      res.clearCookie('connect.sid');
+    } catch (error) {
+      console.error('### CLEAR COOKIE ERROR ###');
+      console.error(error);
+    }
+    return req.session.destroy((sessionError) => {
+      if (sessionError) {
+        console.error('### SESSION DESTROY CALLBACK ERROR ###');
+        console.error(sessionError);
+        return callback(sessionError);
+      }
+      console.info('### SESSION LOGOUT SUCCESSFULLY ###');
+      return callback(null);
+    });
   }
 
   /**
@@ -225,24 +625,44 @@ export class SessionManager {
   }
 
   /**
-   * Resource protection
+   * Resource protection based on configured SESSION_MODE
    * @param {boolean} [isDebugging=false] Debugging flag
-   * @param {boolean} [redirectUrl=''] Redirect flag
+   * @param {string} [redirectUrl=''] Redirect URL
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
-  authenticate (isDebugging = false, redirectUrl = '') {
+  authenticate(isDebugging = false, redirectUrl = '') {
     return async (req, res, next) => {
-      /** @type {{ authorized: boolean }} */
-      const { authorized = isDebugging } = req.user ?? { authorized: isDebugging };
-      if (authorized) {
-        return next();
+      const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
+      if (mode === SessionMode.TOKEN) {
+        return this.#verifyToken(req, res, next, isDebugging, redirectUrl);
       }
-      if(redirectUrl) {
-        return res.redirect(redirectUrl);
-      }
-      return next(new CustomError(httpCodes.UNAUTHORIZED, httpMessages.UNAUTHORIZED));
+      return this.#verifySession(req, res, next, isDebugging, redirectUrl);
     };
-  };
+  }
+
+  /**
+   * Resource protection by token (explicit token verification)
+   * @param {boolean} [isDebugging=false] Debugging flag
+   * @param {string} [redirectUrl=''] Redirect URL
+   * @returns {import('@types/express').RequestHandler} Returns express Request Handler
+   */
+  verifyToken(isDebugging = false, redirectUrl = '') {
+    return async (req, res, next) => {
+      return this.#verifyToken(req, res, next, isDebugging, redirectUrl);
+    };
+  }
+
+  /**
+   * Resource protection by session (explicit session verification)
+   * @param {boolean} [isDebugging=false] Debugging flag
+   * @param {string} [redirectUrl=''] Redirect URL
+   * @returns {import('@types/express').RequestHandler} Returns express Request Handler
+   */
+  verifySession(isDebugging = false, redirectUrl = '') {
+    return async (req, res, next) => {
+      return this.#verifySession(req, res, next, isDebugging, redirectUrl);
+    };
+  }
 
   /**
    * Save session
@@ -279,16 +699,77 @@ export class SessionManager {
   callback(initUser) {
     return async (req, res, next) => {
       const { jwt = '' } = req.query;
-      if(!jwt) {
+      if (!jwt) {
         return next(new CustomError(httpCodes.BAD_REQUEST, 'Missing `jwt` in query parameters'));
       }
+
       try {
-        const payload = await this.#saveSession(req, jwt, initUser);
-        return res.redirect(payload?.redirect_url ? payload.redirect_url : this.#config.SSO_SUCCESS_URL);
+        // Decrypt JWT from Identity Adapter
+        const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
+        
+        if (!payload?.user) {
+          throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
+        }
+
+        const user = initUser(payload.user);
+        const redirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
+
+        // Check SESSION_MODE to determine response type
+        if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+          // Token-based: Generate token and return HTML page that stores it
+          const token = await this.#generateAndStoreToken(user);
+
+          console.debug('### CALLBACK TOKEN GENERATED ###');
+
+          // Return HTML page that stores token in localStorage and redirects
+          return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <title>Authentication Complete</title>
+              <script>
+                (function() {
+                  try {
+                    // Store auth data in localStorage
+                    localStorage.setItem('authToken', ${JSON.stringify(token)});
+                    localStorage.setItem('tokenExpiry', ${Date.now() + this.#config.SESSION_AGE});
+                    localStorage.setItem('user', ${JSON.stringify({
+                      email: user.email,
+                      name: user.name,
+                    })});
+                    
+                    // Redirect to original destination
+                    window.location.replace(${JSON.stringify(redirectUrl)});
+                  } catch (error) {
+                    console.error('Failed to store authentication:', error);
+                    document.getElementById('error').style.display = 'block';
+                  }
+                })();
+              </script>
+              <style>
+                body { font-family: system-ui, sans-serif; text-align: center; padding: 50px; }
+                #error { display: none; color: #d32f2f; margin-top: 20px; }
+              </style>
+            </head>
+            <body>
+              <p>Completing authentication...</p>
+              <div id="error">
+                <p>Authentication failed. Please try again.</p>
+                <a href="${this.#config.SSO_FAILURE_URL}">Return to login</a>
+              </div>
+            </body>
+            </html>
+          `);
+        }
+        else {
+          // Session-based: Save to session and redirect
+          await this.#saveSession(req, jwt, initUser);
+          return res.redirect(redirectUrl);
+        }
       }
       catch (error) {
-        console.error('### LOGIN ERROR ###');
-        console.error(error);
+        console.error('### CALLBACK ERROR ###', error);
         return res.redirect(this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(error.message)));
       }
     };
@@ -315,86 +796,57 @@ export class SessionManager {
   }
 
   /**
-   * Application logout (NOT SSO)
-   * @returns {import('@types/express').RequestHandler} Returns express Request Handler
-   */
-  logout() {
-    return (req, res) => {
-      const { redirect = false } = req.query;
-      const isRedirect = (redirect === 'true' || redirect === true);
-      return this.#logout(req, res, (error => {
-        if (error) {
-          console.error('### LOGOUT CALLBACK ERROR ###');
-          console.error(error);
-          if (isRedirect)
-            return res.redirect(this.#config.SSO_FAILURE_URL);
-          return res.status(httpCodes.AUTHORIZATION_FAILED).send({ redirect_url: this.#config.SSO_FAILURE_URL });
-        }
-        if (isRedirect)
-          return res.redirect(this.#config.SSO_SUCCESS_URL);
-        return res.send({ redirect_url: this.#config.SSO_SUCCESS_URL });
-      }));
-    };
-  }
-
-  /**
-   * Refresh user session
+   * Refresh user authentication based on configured SESSION_MODE
    * @param {(user: object) => object} initUser Initialize user object function
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
   refresh(initUser) {
     const idpUrl = '/auth/refresh'.concat('?client_id=').concat(this.#config.SSO_CLIENT_ID);
     return async (req, res, next) => {
-      try {
-        const { email, attributes } = req.user || { email: '', attributes: {} };
-        if (this.hasLock(email)) {
-          throw new CustomError(httpCodes.CONFLICT, 'User refresh is locked');
-        }
-        this.lock(email);
-        const response = await this.#idpRequest.post(idpUrl, {
-          user: {
-            email,
-            attributes: {
-              idp: attributes?.idp,
-              refresh_token: attributes?.refresh_token
-            },
-          }
-        });
-        if(response.status === httpCodes.OK) {
-          /** @type {{ jwt: string }} */
-          const { jwt } = response.data;
-          const payload = await this.#saveSession(req, jwt, initUser);
-          return res.json(payload);
-        }
-        throw new CustomError(response.status, response.statusText);
-      }
-      catch(error) {
-        return next(httpHelper.handleAxiosError(error));
+      const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
+      
+      if (mode === SessionMode.TOKEN) {
+        return this.#refreshToken(req, res, next, initUser, idpUrl);
+      } else {
+        return this.#refreshSession(req, res, next, initUser, idpUrl);
       }
     };
   }
 
   /**
-   * Logout
-   * @param {import('@types/express').Request} req Request
-   * @param {import('@types/express').Response} res Response
-   * @param {(error: Error)} callback Callback
+   * Application logout based on configured SESSION_MODE (NOT SSO)
+   * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
-  #logout(req, res, callback) {
-    try {
-      res.clearCookie('connect.sid');
-    } catch (error) {
-      console.error('### CLEAR COOKIE ERROR ###');
-      console.error(error);
-    }
-    return req.session.destroy((sessionError) => {
-      if (sessionError) {
-        console.error('### SESSION DESTROY CALLBACK ERROR ###');
-        console.error(sessionError);
-        return callback(sessionError);
+  logout() {
+    return async (req, res) => {
+      const { redirect = false, all = false } = req.query;
+      const isRedirect = (redirect === 'true' || redirect === true);
+      const logoutAll = (all === 'true' || all === true);
+      const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
+      
+      if (mode === SessionMode.TOKEN) {
+        return this.#logoutToken(req, res, isRedirect, logoutAll);
       }
-      console.info('### LOGOUT SUCCESSFULLY ###');
-      return callback(null);
-    });
+
+      // Note: 'all' parameter is only applicable for token-based authentication
+      // Session-based authentication is already single-instance per cookie
+      return this.#logoutSession(req, res, (error) => {
+        if (error) {
+          console.error('### LOGOUT CALLBACK ERROR ###');
+          console.error(error);
+          if (isRedirect) {
+            return res.redirect(this.#config.SSO_FAILURE_URL);
+          }
+          return res.status(httpCodes.AUTHORIZATION_FAILED).send({ 
+            redirect_url: this.#config.SSO_FAILURE_URL 
+          });
+        }
+        if (isRedirect) {
+          return res.redirect(this.#config.SSO_SUCCESS_URL);
+        }
+        return res.send({ redirect_url: this.#config.SSO_SUCCESS_URL });
+      });
+    };
   }
+
 }
