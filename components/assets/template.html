@@ -63,7 +63,6 @@
         flex-direction: column;
         padding: var(--gap-global);
       }
-      .wrapper #success,
       .wrapper #failure {
         display: none;
       }
@@ -82,7 +81,7 @@
     (function() {
       try {
         globalThis.localStorage.setItem('{{SESSION_KEY}}', '{{SESSION_VALUE}}');
-        // globalThis.location.replace('{{REDIRECT_URL}}');
+        globalThis.location.replace('{{REDIRECT_URL}}');
       } catch {
         document.getElementById('success').style.display = 'none';
         document.getElementById('failure').style.display = 'block';
