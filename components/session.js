@@ -750,7 +750,7 @@ export class SessionManager {
           console.debug('### CALLBACK TOKEN GENERATED ###');
 
           // Return HTML page that stores token in localStorage and redirects
-          const template = fs.readFileSync(path.resolve(__dirname, 'components', 'assets', 'template.html'), 'utf8');
+          const template = fs.readFileSync(path.resolve(__dirname, 'assets', 'template.html'), 'utf8');
           const html = template
             .replaceAll('{{SESSION_KEY}}', this.#config.SESSION_KEY)
             .replaceAll('{{SESSION_VALUE}}', token)
