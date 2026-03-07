@@ -385,7 +385,7 @@ fetch('/api/auth/logout?all=true', {
 In TOKEN mode, tokens are stored in Redis with the following structure:
 
 ```
-Key Pattern: {SESSION_PREFIX}token:{email}:{tokenId}
+Key Pattern: {SESSION_PREFIX}token:{email}:{tid}
 Value: JSON.stringify(user)
 TTL: SESSION_AGE / 1000 seconds
 
@@ -397,7 +397,7 @@ TTL: 64800 seconds (18 hours)
 
 ### Multiple Device Support
 
-Each device/session gets a unique `tokenId`, allowing users to be authenticated on multiple devices simultaneously. When logging out:
+Each device/session gets a unique `tid`, allowing users to be authenticated on multiple devices simultaneously. When logging out:
 - `logout()` - Removes only the current token
 - `logout()?all=true` - Removes all tokens for the user (all devices)
 

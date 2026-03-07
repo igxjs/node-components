@@ -1,4 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
+
 import axios from 'axios';
 import session from 'express-session';
 import memStore from 'memorystore';
@@ -21,9 +24,8 @@ export const SessionMode = {
  */
 export class SessionConfig {
   /** 
-   * @type {string} 
-   * Authentication mode for protected routes
-   * Supported values: SessionMode.SESSION | SessionMode.TOKEN
+   * @type {string} Authentication mode for protected routes
+   * - Supported values: SessionMode.SESSION | SessionMode.TOKEN
    * @default SessionMode.SESSION
    */
   SESSION_MODE;
@@ -38,35 +40,61 @@ export class SessionConfig {
   /** @type {string} */
   SSO_FAILURE_URL;
 
-  /** @type {number} */
+  /** @type {number} Session age in seconds */
   SESSION_AGE;
-  /** @type {string} */
+  /**
+   * @type {string} Session cookie path
+   * @default '/'
+   */
   SESSION_COOKIE_PATH;
-  /** @type {string} */
+  /** @type {string} Session secret */
   SESSION_SECRET;
-  /** @type {string} */
+  /** 
+   * @type {string} 
+   * @default 'ibmid:'
+   */
   SESSION_PREFIX;
-
-  /** @type {string} */
+  /** 
+   * @type {string} Session key
+   * - In the `SessionMode.SESSION` mode, this is the key used to store the user in the session.
+   * - In the `SessionMode.TOKEN` mode, this is the key of localStorage where the user is stored.
+   * @default 'user'
+   */
+  SESSION_KEY;
+  /** @type {string} Redis URL */
   REDIS_URL;
-  /** @type {string} */
+  /** @type {string} Redis certificate path */
   REDIS_CERT_PATH;
-
-  /** @type {string} */
+  /**
+   * @type {string} Algorithm used to encrypt the JWT
+   * @default 'dir'
+   */
   JWT_ALGORITHM;
-  /** @type {string} */
+  /**
+   * @type {string} Encryption algorithm used to encrypt the JWT
+   * @default 'A256GCM'
+   */
   JWT_ENCRYPTION;
-  /** @type {string} */
+  /**
+   * @type {string} Expiration time of the JWT
+   * @default '10m'
+   */
   JWT_EXPIRATION_TIME;
-  /** @type {number} */
+  /**
+   * @type {number} Clock tolerance in seconds
+   * @default 30
+   */
   JWT_CLOCK_TOLERANCE;
-  /** @type {string} */
+  /**
+   * @type {string} Hash algorithm used to hash the JWT secret
+   * @default 'SHA-256'
+   */
   JWT_SECRET_HASH_ALGORITHM;
-  /** @type {string} */
+  /** @type {string?} JWT issuer claim */
   JWT_ISSUER;
-  /** @type {string} */
+  /** @type {string?} JWT audience claim */
   JWT_AUDIENCE;
-  /** @type {string} */
+  /** @type {string?} JWT subject claim */
   JWT_SUBJECT;
 }
 
@@ -155,18 +183,18 @@ export class SessionManager {
    * @returns {string} Returns the session key
    */
   #getSessionKey() {
-    return 'user';
+    return this.#config.SESSION_KEY;
   }
 
   /**
    * Get Redis key for token storage
    * @param {string} email User email
-   * @param {string} tokenId Token ID
+   * @param {string} tid Token ID
    * @returns {string} Returns the Redis key for token storage
    * @private
    */
-  #getTokenRedisKey(email, tokenId) {
-    return `${this.#config.SESSION_PREFIX}token:${email}:${tokenId}`;
+  #getTokenRedisKey(email, tid) {
+    return `${this.#config.SESSION_KEY}:t:${email}:${tid}`;
   }
 
   /**
@@ -176,7 +204,7 @@ export class SessionManager {
    * @private
    */
   #getTokenRedisPattern(email) {
-    return `${this.#config.SESSION_PREFIX}token:${email}:*`;
+    return `${this.#config.SESSION_KEY}:t:${email}:*`;
   }
 
   /**
@@ -195,30 +223,24 @@ export class SessionManager {
    */
   async #generateAndStoreToken(user) {
     // Generate unique token ID for this device/session
-    const tokenId = crypto.randomUUID();
-    
-    // Create JWT token with email and tokenId
-    const token = await this.#jwtManager.encrypt(
-      { 
-        email: user.email, 
-        tokenId 
-      },
-      this.#config.SESSION_SECRET,
-      { expirationTime: this.#config.JWT_EXPIRATION_TIME }
-    );
-    
-    // Store user data in Redis with TTL
-    const redisKey = this.#getTokenRedisKey(user.email, tokenId);
+    const tid = crypto.randomUUID();
     const ttlSeconds = Math.floor(this.#config.SESSION_AGE / 1000);
-    
+    // Create JWT token with email and tid
+    const token = await this.#jwtManager.encrypt(
+      { tid, user },
+      this.#config.SESSION_SECRET,
+      { expirationTime: ttlSeconds }
+    );
+
+    // Store user data in Redis with TTL
+    const redisKey = this.#getTokenRedisKey(user.email, id);
+
     await this.#redisManager.getClient().setEx(
       redisKey,
       ttlSeconds,
       JSON.stringify(user)
     );
-    
     console.debug(`### TOKEN GENERATED: ${user.email} ###`);
-    
     return token;
   }
 
@@ -247,14 +269,14 @@ export class SessionManager {
         this.#config.SESSION_SECRET
       );
 
-      // Extract email and tokenId
-      const { email, tokenId } = payload;
-      if (!email || !tokenId) {
+      // Extract email and token ID
+      const { email, tid } = payload;
+      if (!email || !tid) {
         throw new CustomError(httpCodes.UNAUTHORIZED, 'Invalid token payload');
       }
 
       // Lookup user in Redis
-      const redisKey = this.#getTokenRedisKey(email, tokenId);
+      const redisKey = this.#getTokenRedisKey(email, tid);
       const userData = await this.#redisManager.getClient().get(redisKey);
 
       if (!userData) {
@@ -331,11 +353,11 @@ export class SessionManager {
         throw new CustomError(httpCodes.UNAUTHORIZED, 'User not authenticated');
       }
 
-      // Extract tokenId from current token
+      // Extract Token ID from current token
       const authHeader = req.headers.authorization;
       const token = authHeader?.substring(7);
       const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
-      const oldTokenId = payload.tokenId;
+      const oldTokenId = payload.tid;
 
       // Check refresh lock
       if (this.hasLock(email)) {
@@ -487,7 +509,7 @@ export class SessionManager {
     }
 
     try {
-      // Extract tokenId from current token
+      // Extract Token ID from current token
       const authHeader = req.headers.authorization;
       const token = authHeader?.substring(7);
 
@@ -496,10 +518,10 @@ export class SessionManager {
       }
 
       const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
-      const { email, tokenId } = payload;
+      const { email, tid } = payload;
 
       // Remove token from Redis
-      const redisKey = this.#getTokenRedisKey(email, tokenId);
+      const redisKey = this.#getTokenRedisKey(email, tid);
       await this.#redisManager.getClient().del(redisKey);
 
       console.info('### TOKEN LOGOUT SUCCESSFULLY ###');
@@ -711,7 +733,9 @@ export class SessionManager {
           throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
         }
 
+        /** @type {import('../index.js').SessionUser} */
         const user = initUser(payload.user);
+        /** @type {string} */
         const redirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
 
         // Check SESSION_MODE to determine response type
@@ -722,51 +746,17 @@ export class SessionManager {
           console.debug('### CALLBACK TOKEN GENERATED ###');
 
           // Return HTML page that stores token in localStorage and redirects
-          return res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="UTF-8">
-              <title>Authentication Complete</title>
-              <script>
-                (function() {
-                  try {
-                    // Store auth data in localStorage
-                    localStorage.setItem('authToken', ${JSON.stringify(token)});
-                    localStorage.setItem('tokenExpiry', ${Date.now() + this.#config.SESSION_AGE});
-                    localStorage.setItem('user', ${JSON.stringify({
-                      email: user.email,
-                      name: user.name,
-                    })});
-                    
-                    // Redirect to original destination
-                    window.location.replace(${JSON.stringify(redirectUrl)});
-                  } catch (error) {
-                    console.error('Failed to store authentication:', error);
-                    document.getElementById('error').style.display = 'block';
-                  }
-                })();
-              </script>
-              <style>
-                body { font-family: system-ui, sans-serif; text-align: center; padding: 50px; }
-                #error { display: none; color: #d32f2f; margin-top: 20px; }
-              </style>
-            </head>
-            <body>
-              <p>Completing authentication...</p>
-              <div id="error">
-                <p>Authentication failed. Please try again.</p>
-                <a href="${this.#config.SSO_FAILURE_URL}">Return to login</a>
-              </div>
-            </body>
-            </html>
-          `);
+          const template = fs.readFileSync(path.join('components', 'assets', 'template.html'), 'utf8');
+          const html = template
+            .replaceAll('{{SESSION_KEY}}', this.#config.SESSION_KEY)
+            .replaceAll('{{SESSION_VALUE}}', token)
+            .replaceAll('{{REDIRECT_URL}}', redirectUrl)
+            .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
+          return res.send(html);
         }
-        else {
-          // Session-based: Save to session and redirect
-          await this.#saveSession(req, jwt, initUser);
-          return res.redirect(redirectUrl);
-        }
+        // Session-based: Save to session and redirect
+        await this.#saveSession(req, jwt, initUser);
+        return res.redirect(redirectUrl);
       }
       catch (error) {
         console.error('### CALLBACK ERROR ###', error);

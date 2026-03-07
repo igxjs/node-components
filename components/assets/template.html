@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Sign in IBM Garage</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no,viewport-fit=cover,minimum-scale=1,maximum-scale=1,user-scalable=no">
+    <meta name="robots" content="noindex, nofollow" />
+    <style>
+      :root {
+        --foreground-color-primary: #444;
+        --font-size: 0.8rem;
+        --background-color-primary: #f1f1f199;
+        --gap-global: 0.4rem;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background-color-primary: black;
+          --foreground-color-primary: #bbb;
+        }
+      }
+      html, body {
+        padding: 0px;
+        margin: 0px auto;
+        height: 100%;
+        width: 100%;
+      }
+      body {
+        background-image: radial-gradient(circle at 20% 80%, rgba(255, 140, 140, 0.5), transparent 42%),
+          radial-gradient(circle at 80% 20%, rgba(140, 200, 255, 0.55), transparent 42%),
+          radial-gradient(circle at 40% 40%, rgba(255, 230, 140, 0.45), transparent 32%),
+          linear-gradient(135deg, rgba(160, 120, 240, 0.95), rgba(120, 160, 240, 0.95));
+        background-size: cover;
+        background-repeat: no-repeat;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Verdana, Helvetica, Arial, sans-serif;
+        font-size: var(--font-size);
+        color: var(--foreground-color-primary);
+        flex-flow: column;
+        position: relative;
+        z-index: 10;
+        overflow: hidden;
+      }
+      body::before {
+        background: var(--background-color-primary);
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: -1;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+      .wrapper {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+        row-gap: var(--gap-global);
+        flex-direction: column;
+        padding: var(--gap-global);
+      }
+      .wrapper #success,
+      .wrapper #failure {
+        display: none;
+      }
+    </style>
+  </head>
+<body>
+  <hr />
+  <div class="wrapper">
+    <div id="success">Redirecting to the home page...</div>
+    <div id="failure">
+      <p>Authentication failed. Please try again.</p>
+      <a href="{{SSO_FAILURE_URL}}">Return to login</a>
+    </div>
+  </div>
+  <script>
+    (function() {
+      try {
+        globalThis.localStorage.setItem('{{SESSION_KEY}}', '{{SESSION_VALUE}}');
+        // globalThis.location.replace('{{REDIRECT_URL}}');
+      } catch {
+        document.getElementById('success').style.display = 'none';
+        document.getElementById('failure').style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>

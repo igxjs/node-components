@@ -93,7 +93,8 @@ export class JwtManager {
     const jwt = new EncryptJWT(data)
       .setProtectedHeader({
         alg: algorithm,
-        enc: encryption
+        enc: encryption,
+        typ: 'JWT',
       })
       .setIssuedAt()
       .setExpirationTime(expirationTime);
