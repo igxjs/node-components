@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 import axios from 'axios';
 import session from 'express-session';
@@ -10,6 +11,9 @@ import { RedisStore } from 'connect-redis';
 import { CustomError, httpCodes, httpHelper, httpMessages } from './http-handlers.js';
 import { JwtManager } from './jwt.js';
 import { RedisManager } from './redis.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Session authentication mode constants
@@ -746,7 +750,7 @@ export class SessionManager {
           console.debug('### CALLBACK TOKEN GENERATED ###');
 
           // Return HTML page that stores token in localStorage and redirects
-          const template = fs.readFileSync(path.resolve('components', 'assets', 'template.html'), 'utf8');
+          const template = fs.readFileSync(path.resolve(__dirname, 'components', 'assets', 'template.html'), 'utf8');
           const html = template
             .replaceAll('{{SESSION_KEY}}', this.#config.SESSION_KEY)
             .replaceAll('{{SESSION_VALUE}}', token)
