@@ -44,7 +44,7 @@ const config = {
   SESSION_AGE: 64800000,               // 18 hours in milliseconds
   SESSION_COOKIE_PATH: '/',
   SESSION_SECRET: 'your-session-secret',
-  SESSION_PREFIX: 'ibmid:',            // Default value when not provided
+  SESSION_KEY: 'user',                  // Default value when not provided
 
   // Redis Configuration (optional - uses memory store if not provided)
   REDIS_URL: 'redis://localhost:6379',
@@ -65,7 +65,7 @@ const config = {
 ### Configuration Options Reference
 
 | Option | Type | Required | Default | Description |
-|--------|------|----------|---------|-------------|
+|--------|------|----------|---------|---------|
 | `SSO_ENDPOINT_URL` | string | Yes | - | Identity provider endpoint URL |
 | `SSO_CLIENT_ID` | string | Yes | - | SSO client ID |
 | `SSO_CLIENT_SECRET` | string | Yes | - | SSO client secret |
@@ -74,9 +74,12 @@ const config = {
 | `SESSION_MODE` | string | No | `SessionMode.SESSION` | Session mode: `SessionMode.SESSION` or `SessionMode.TOKEN` |
 | `SESSION_AGE` | number | No | 64800000 | Session/token timeout in milliseconds |
 | `SESSION_COOKIE_PATH` | string | No | `'/'` | Session cookie path (SESSION mode) |
-| `SESSION_SECRET` | string | Yes | - | Session/JWT secret key |
-| `SESSION_PREFIX` | string | No | `'ibmid:'` | Redis key prefix |
-| `REDIS_URL` | string | No | - | Redis connection URL (uses memory if not provided) |
+| `SESSION_SECRET` | string | Yes | - | **JWT secret key used for encrypting/decrypting JWT tokens** |
+| `SESSION_KEY` | string | No | `'user'` | **Key name used to store user data** |
+|   |   |   |   | • SESSION mode: Key name in Express session storage (`req.session['user']`) |
+|   |   |   |   | • TOKEN mode: LocalStorage key name + prefix for Redis token storage |
+| `SESSION_PREFIX` | string | No | `'ibmid:'` | Redis key prefix (used by default when not provided) |
+| `REDIS_URL` | string | No | - | Redis connection URL (uses memory if not provided; **Required for TOKEN mode**) |
 | `REDIS_CERT_PATH` | string | No | - | Path to Redis TLS certificate |
 | `JWT_ALGORITHM` | string | No | `'dir'` | JWT signing algorithm |
 | `JWT_ENCRYPTION` | string | No | `'A256GCM'` | JWE encryption algorithm |
@@ -129,7 +132,7 @@ export const session = new SessionManager({
   SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
   SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET,
   SESSION_AGE: 64800000,
-  SESSION_SECRET: process.env.SESSION_SECRET,
+  SESSION_SECRET: process.env.SESSION_SECRET,  // JWT encryption key
   REDIS_URL: process.env.REDIS_URL
 });
 ```
@@ -189,7 +192,8 @@ export const session = new SessionManager({
   SSO_FAILURE_URL: '/login',
   SESSION_MODE: SessionMode.TOKEN,  // Enable token-based authentication
   SESSION_AGE: 64800000,
-  SESSION_SECRET: process.env.SESSION_SECRET,
+  SESSION_SECRET: process.env.SESSION_SECRET,  // JWT encryption key
+  SESSION_KEY: 'user',                       // LocalStorage key name (default: 'user')
   REDIS_URL: process.env.REDIS_URL,  // Required for TOKEN mode
   JWT_EXPIRATION_TIME: '1h'
 });
@@ -245,7 +249,7 @@ When using TOKEN mode, the SSO callback returns an HTML page that stores the tok
 
 ```javascript
 // Client-side: Making authenticated requests
-const token = localStorage.getItem('authToken');
+const token = localStorage.getItem('user');  // Uses SESSION_KEY as default
 
 fetch('/api/protected', {
   headers: {
@@ -264,8 +268,7 @@ fetch('/api/auth/refresh', {
 })
 .then(response => response.json())
 .then(data => {
-  localStorage.setItem('authToken', data.token);
-  localStorage.setItem('tokenExpiry', Date.now() + data.expiresIn * 1000);
+  localStorage.setItem('user', data.token);  // Update token in localStorage
 });
 
 // Logout
@@ -276,9 +279,7 @@ fetch('/api/auth/logout', {
   }
 })
 .then(() => {
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('tokenExpiry');
-  localStorage.removeItem('user');
+  localStorage.removeItem('user');  // Remove token from localStorage
   window.location.href = '/login';
 });
 
@@ -290,8 +291,6 @@ fetch('/api/auth/logout?all=true', {
   }
 })
 .then(() => {
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('tokenExpiry');
   localStorage.removeItem('user');
   window.location.href = '/login';
 });
@@ -365,7 +364,7 @@ fetch('/api/auth/logout?all=true', {
 
 1. User clicks "Login" → Redirected to SSO provider
 2. SSO authenticates user → Redirects to `/auth/callback?jwt=...`
-3. `session.callback()` decrypts JWT → Saves user to session store
+3. `session.callback()` decrypts JWT → Saves user to session store under key name `SESSION_KEY` (default: 'user')
 4. User redirected to success URL with session cookie
 5. Protected routes verify session cookie → Access user via `req.user`
 6. Logout destroys session and clears cookie
@@ -374,8 +373,8 @@ fetch('/api/auth/logout?all=true', {
 
 1. User clicks "Login" → Redirected to SSO provider
 2. SSO authenticates user → Redirects to `/auth/callback?jwt=...`
-3. `session.callback()` decrypts JWT → Generates JWT token → Stores in Redis
-4. Returns HTML page that saves token to localStorage → Redirects to success URL
+3. `session.callback()` decrypts JWT → Generates JWT token → Stores in Redis under key pattern: `{SESSION_KEY}:t:{email}:{tid}`
+4. Returns HTML page that saves token to localStorage under `SESSION_KEY` (default: 'user') → Redirects to success URL
 5. Client includes token in `Authorization: Bearer {token}` header
 6. Protected routes verify token → Access user via `req.user`
 7. Logout removes token from Redis (current or all tokens)
@@ -385,12 +384,12 @@ fetch('/api/auth/logout?all=true', {
 In TOKEN mode, tokens are stored in Redis with the following structure:
 
 ```
-Key Pattern: {SESSION_PREFIX}token:{email}:{tid}
+Key Pattern: {SESSION_PREFIX}{SESSION_KEY}:t:{email}:{tid}
 Value: JSON.stringify(user)
 TTL: SESSION_AGE / 1000 seconds
 
-Example:
-Key: ibmid:token:user@example.com:550e8400-e29b-41d4-a716-934b00000001
+Example (default SESSION_KEY='user', SESSION_PREFIX='ibmid:'):
+Key: ibmid:user:t:user@example.com:550e8400-e29b-41d4-a716-934b00000001
 Value: {"email":"user@example.com","name":"John Doe","authorized":true}
 TTL: 64800 seconds (18 hours)
 ```
@@ -400,6 +399,21 @@ TTL: 64800 seconds (18 hours)
 Each device/session gets a unique `tid`, allowing users to be authenticated on multiple devices simultaneously. When logging out:
 - `logout()` - Removes only the current token
 - `logout()?all=true` - Removes all tokens for the user (all devices)
+
+## SESSION_KEY Configuration Explained
+
+**SESSION_KEY serves dual purposes depending on the authentication mode:**
+
+### In SESSION Mode:
+- Acts as the key name in Express session storage
+- User data is stored as: `req.session[SESSION_KEY]` (e.g., `req.session['user']`)
+- The cookie name set by express-session will be the same as `SESSION_KEY`
+- Session ID and secret are handled automatically by express-session
+
+### In TOKEN Mode:
+- Acts as the LocalStorage key name where client stores the JWT token
+- Acts as the prefix for Redis token storage keys (key pattern: `{SESSION_KEY}:t:{email}:{tid}`)
+- Default value is `'user'`, so localStorage stores token at `localStorage['user']`
 
 ## Session Refresh Locks
 
@@ -421,20 +435,55 @@ session.lock(email); // Sets 60-second lock
 ## Security Considerations
 
 ### SESSION Mode
-- Session IDs are automatically generated by express-session
-- Sessions stored server-side (Redis or memory)
-- Vulnerable to CSRF (use CSRF protection middleware)
-- Cookie-based, subject to cookie policies
+
+**Data Storage:**
+- User data stored in Express session store (Redis or memory)
+- Session cookie is automatically set by express-session with name `SESSION_KEY` (default: 'user')
+- Sessions are encrypted using `SESSION_SECRET` for server-side storage
+
+**Client-Side Flow:**
+- Client receives JWT from SSO callback and stores it temporarily
+- Express session manages authentication state between requests
+- Session data is accessible via `req.user` in protected routes
+
+**Security:**
+- Use CSRF protection middleware (e.g., `express-csrf`)
+- Set secure, HttpOnly cookies where supported
+- SESSION_SECRET must be cryptographically strong
+
+**Use Cases:**
+- Traditional web applications with server-side rendering
+- Applications where cookies are acceptable
+- Single-device/single-browser sessions
 
 ### TOKEN Mode
-- Tokens encrypted using JWE (JSON Web Encryption)
-- Each token has a unique ID stored in Redis
-- Token invalidation supported (logout)
-- Requires secure storage on client (localStorage risks XSS)
-- Not vulnerable to CSRF (no cookies)
-- Requires HTTPS in production
 
-### Best Practices
+**Data Storage:**
+- JWT tokens encrypted with `SESSION_SECRET` and stored in Redis
+- Token key pattern: `{SESSION_KEY}:t:{email}:{tid}` (default: `user:t:*`)
+- Each token has unique ID (`tid`) for multi-device support
+- User data stored in Redis using same key prefix
+
+**Client-Side Flow:**
+1. SSO callback returns HTML page with JavaScript that stores JWT token in localStorage under `SESSION_KEY` (default: 'user')
+2. Client includes `Authorization: Bearer {token}` header in requests
+3. Tokens validated against Redis storage
+- Each device gets its own token (`tid`)
+
+**Security:**
+- **Not vulnerable to CSRF** (no cookies)
+- Requires HTTPS in production (JWT contains sensitive user data)
+- localStorage is vulnerable to XSS attacks
+- Consider using secure, isolated storage if possible
+- SESSION_SECRET must be cryptographically strong
+
+**Use Cases:**
+- Single Page Applications (SPAs)
+- Mobile applications
+- APIs requiring stateless authentication
+- Multi-device sessions (each device gets its own token)
+
+## Best Practices
 
 1. **Always use HTTPS in production** - Especially critical for TOKEN mode
 2. **Set strong SESSION_SECRET** - Use cryptographically secure random strings
@@ -486,7 +535,7 @@ const session = new SessionManager({
 });
 ```
 
-2. **Update client-side code** to use Bearer tokens instead of cookies
+2. **Update client-side code** to use Bearer tokens instead of cookies (access token via `localStorage.getItem('user')`)
 
 3. **Update API endpoints** to expect `Authorization` header
 

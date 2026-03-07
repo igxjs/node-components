@@ -127,6 +127,7 @@ export class SessionManager {
       SESSION_COOKIE_PATH: config.SESSION_COOKIE_PATH || '/',
       SESSION_SECRET: config.SESSION_SECRET,
       SESSION_PREFIX: config.SESSION_PREFIX || 'ibmid:',
+      SESSION_KEY: config.SESSION_KEY || 'user',
       // Identity Provider
       SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
       SSO_CLIENT_ID: config.SSO_CLIENT_ID,
