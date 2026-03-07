@@ -233,7 +233,7 @@ export class SessionManager {
     );
 
     // Store user data in Redis with TTL
-    const redisKey = this.#getTokenRedisKey(user.email, id);
+    const redisKey = this.#getTokenRedisKey(user.email, tid);
 
     await this.#redisManager.getClient().setEx(
       redisKey,
