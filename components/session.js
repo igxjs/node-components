@@ -62,9 +62,16 @@ export class SessionConfig {
    * @type {string} Session key
    * - In the `SessionMode.SESSION` mode, this is the key used to store the user in the session.
    * - In the `SessionMode.TOKEN` mode, this is the key of localStorage where the user is stored.
-   * @default 'user'
+   * @default 'ibm_garage_user'
    */
   SESSION_KEY;
+  /** 
+   * @type {string} Session key
+   * - In the `SessionMode.SESSION` mode, this is the key used to store the user in the session.
+   * - In the `SessionMode.TOKEN` mode, this is the key of localStorage where the user is stored.
+   * @default 'ibm_garage_session_expires'
+   */
+  SESSION_EXPIRY_KEY;
   /** @type {string} Redis URL */
   REDIS_URL;
   /** @type {string} Redis certificate path */
@@ -127,7 +134,8 @@ export class SessionManager {
       SESSION_COOKIE_PATH: config.SESSION_COOKIE_PATH || '/',
       SESSION_SECRET: config.SESSION_SECRET,
       SESSION_PREFIX: config.SESSION_PREFIX || 'ibmid:',
-      SESSION_KEY: config.SESSION_KEY || 'user',
+      SESSION_KEY: config.SESSION_KEY || 'ibm_garage_user',
+      SESSION_EXPIRY_KEY: config.SESSION_EXPIRY_KEY || 'ibm_garage_session_expires',
       // Identity Provider
       SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
       SSO_CLIENT_ID: config.SSO_CLIENT_ID,
@@ -753,8 +761,10 @@ export class SessionManager {
           // Return HTML page that stores token in localStorage and redirects
           const template = fs.readFileSync(path.resolve(__dirname, 'assets', 'template.html'), 'utf8');
           const html = template
-            .replaceAll('{{SESSION_KEY}}', this.#config.SESSION_KEY)
-            .replaceAll('{{SESSION_VALUE}}', token)
+            .replaceAll('{{SESSION_DATA_KEY}}', this.#config.SESSION_KEY)
+            .replaceAll('{{SESSION_DATA_VALUE}}', token)
+            .replaceAll('{{SESSION_EXPIRY_KEY}}', this.#config.SESSION_EXPIRY_KEY)
+            .replaceAll('{{SESSION_EXPIRY_VALUE}}', user.attributes.expires_at)
             .replaceAll('{{REDIRECT_URL}}', redirectUrl)
             .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
           return res.send(html);
