@@ -62,14 +62,13 @@ export class SessionConfig {
    * @type {string} Session key
    * - In the `SessionMode.SESSION` mode, this is the key used to store the user in the session.
    * - In the `SessionMode.TOKEN` mode, this is the key of localStorage where the user is stored.
-   * @default 'ibm_garage_user'
+   * @default 'session_token'
    */
   SESSION_KEY;
   /** 
-   * @type {string} Session key
-   * - In the `SessionMode.SESSION` mode, this is the key used to store the user in the session.
-   * - In the `SessionMode.TOKEN` mode, this is the key of localStorage where the user is stored.
-   * @default 'ibm_garage_session_expires'
+   * @type {string} Session expiry key
+   * - In the `SessionMode.TOKEN` mode, this is the key of localStorage where the session expiry timestamp is stored.
+   * @default 'session_expires_at'
    */
   SESSION_EXPIRY_KEY;
   /** @type {string} Redis URL */
@@ -134,8 +133,8 @@ export class SessionManager {
       SESSION_COOKIE_PATH: config.SESSION_COOKIE_PATH || '/',
       SESSION_SECRET: config.SESSION_SECRET,
       SESSION_PREFIX: config.SESSION_PREFIX || 'ibmid:',
-      SESSION_KEY: config.SESSION_KEY || 'ibm_garage_user',
-      SESSION_EXPIRY_KEY: config.SESSION_EXPIRY_KEY || 'ibm_garage_session_expires',
+      SESSION_KEY: config.SESSION_KEY || 'session_token',
+      SESSION_EXPIRY_KEY: config.SESSION_EXPIRY_KEY || 'session_expires_at',
       // Identity Provider
       SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
       SSO_CLIENT_ID: config.SSO_CLIENT_ID,

@@ -44,8 +44,8 @@ const config = {
   SESSION_AGE: 64800000,               // 18 hours in milliseconds
   SESSION_COOKIE_PATH: '/',
   SESSION_SECRET: 'your-session-secret',
-  SESSION_KEY: 'ibm_garage_user',            // Key name used to store user data (default: 'ibm_garage_user')
-  SESSION_EXPIRY_KEY: 'expires_at',     // LocalStorage key name for expiry timestamp (default: 'ibm_garage_session_expires')
+  SESSION_KEY: 'session_token',        // Key name used to store user data (default: 'session_token')
+  SESSION_EXPIRY_KEY: 'session_expires_at',  // LocalStorage key name for expiry timestamp (default: 'session_expires_at')
 
   // Redis Configuration (optional - uses memory store if not provided)
   REDIS_URL: 'redis://localhost:6379',
@@ -76,10 +76,10 @@ const config = {
 | `SESSION_AGE` | number | No | 64800000 | Session/token timeout in milliseconds |
 | `SESSION_COOKIE_PATH` | string | No | `'/'` | Session cookie path (SESSION mode) |
 | `SESSION_SECRET` | string | Yes | - | **JWT secret key used for encrypting/decrypting JWT tokens** |
-| `SESSION_KEY` | string | No | `'ibm_garage_user'` | **Key name used to store user data** |
-|   |   |   |   | • SESSION mode: Key name in Express session storage (`req.session['user']`) |
+| `SESSION_KEY` | string | No | `'session_token'` | **Key name used to store user data** |
+|   |   |   |   | • SESSION mode: Key name in Express session storage (`req.session['session_token']`) |
 |   |   |   |   | • TOKEN mode: LocalStorage key name for JWT token + prefix for Redis token storage |
-| `SESSION_EXPIRY_KEY` | string | No | `'ibm_garage_session_expires'` | **LocalStorage key name for session expiry timestamp (TOKEN mode only)** |
+| `SESSION_EXPIRY_KEY` | string | No | `'session_expires_at'` | **LocalStorage key name for session expiry timestamp (TOKEN mode only)** |
 |   |   |   |   | • Stores the expires_at timestamp in browser's localStorage for client-side expiration checking |
 | `SESSION_PREFIX` | string | No | `'ibmid:'` | Redis key prefix (used by default when not provided) |
 | `REDIS_URL` | string | No | - | Redis connection URL (uses memory if not provided; **Required for TOKEN mode**) |
@@ -196,8 +196,8 @@ export const session = new SessionManager({
   SESSION_MODE: SessionMode.TOKEN,  // Enable token-based authentication
   SESSION_AGE: 64800000,
   SESSION_SECRET: process.env.SESSION_SECRET,  // JWT encryption key
-  SESSION_KEY: 'ibm_garage_user',             // LocalStorage key name for JWT token (default: 'ibm_garage_user')
-  SESSION_EXPIRY_KEY: 'expires_at',          // LocalStorage key name for expiry timestamp (default: 'ibm_garage_session_expires')
+  SESSION_KEY: 'session_token',      // LocalStorage key name for JWT token (default: 'session_token')
+  SESSION_EXPIRY_KEY: 'session_expires_at',  // LocalStorage key name for expiry timestamp (default: 'session_expires_at')
   REDIS_URL: process.env.REDIS_URL,  // Required for TOKEN mode
   JWT_EXPIRATION_TIME: '1h'
 });
@@ -253,8 +253,8 @@ When using TOKEN mode, the SSO callback returns an HTML page that stores the tok
 
 ```javascript
 // Client-side: Making authenticated requests
-const token = localStorage.getItem('ibm_garage_user');  // Uses SESSION_KEY (default: 'ibm_garage_user')
-const expiresAt = localStorage.getItem('ibm_garage_session_expires');  // Uses SESSION_EXPIRY_KEY
+const token = localStorage.getItem('session_token');  // Uses SESSION_KEY (default: 'session_token')
+const expiresAt = localStorage.getItem('session_expires_at');  // Uses SESSION_EXPIRY_KEY (default: 'session_expires_at')
 
 // Check if token is expired before making request
 if (expiresAt && new Date(expiresAt) < new Date()) {
@@ -279,7 +279,8 @@ fetch('/api/auth/refresh', {
 })
 .then(response => response.json())
 .then(data => {
-  localStorage.setItem('user', data.token);  // Update token in localStorage
+  localStorage.setItem('session_token', data.token);  // Update token in localStorage
+  localStorage.setItem('session_expires_at', data.user.attributes.expires_at);  // Update expiry
 });
 
 // Logout
@@ -290,8 +291,8 @@ fetch('/api/auth/logout', {
   }
 })
 .then(() => {
-  localStorage.removeItem('user');  // Remove token from localStorage
-  localStorage.removeItem('ibm_garage_session_expires');  // Remove expiry
+  localStorage.removeItem('session_token');  // Remove token from localStorage
+  localStorage.removeItem('session_expires_at');  // Remove expiry
   window.location.href = '/login';
 });
 
@@ -303,8 +304,8 @@ fetch('/api/auth/logout?all=true', {
   }
 })
 .then(() => {
-  localStorage.removeItem('user');
-  localStorage.removeItem('ibm_garage_session_expires');
+  localStorage.removeItem('session_token');
+  localStorage.removeItem('session_expires_at');
   window.location.href = '/login';
 });
 ```
@@ -402,8 +403,8 @@ Key Pattern: {SESSION_PREFIX}{SESSION_KEY}:t:{email}:{tid}
 Value: JSON.stringify(user)
 TTL: SESSION_AGE / 1000 seconds
 
-Example (default SESSION_KEY='ibm_garage_user', SESSION_PREFIX='ibmid:'):
-Key: ibmid:user:t:user@example.com:550e8400-e29b-41d4-a716-934b00000001
+Example (default SESSION_KEY='session_token', SESSION_PREFIX='ibmid:'):
+Key: ibmid:session_token:t:user@example.com:550e8400-e29b-41d4-a716-934b00000001
 Value: {"email":"user@example.com","name":"John Doe","authorized":true}
 TTL: 64800 seconds (18 hours)
 ```
@@ -447,13 +448,13 @@ session.lock(email); // Sets 60-second lock
 
 In **SESSION Mode**:
 - Acts as the key name in Express session storage
-- User data is stored as: `req.session[SESSION_KEY]` (e.g., `req.session['user']`)
+- User data is stored as: `req.session[SESSION_KEY]` (e.g., `req.session['session_token']`)
 - Session ID and secret are handled automatically by express-session
 
 In **TOKEN Mode**:
 - Acts as the LocalStorage key name where client stores the JWT token
 - Acts as the prefix for Redis token storage keys (key pattern: `{SESSION_KEY}:t:{email}:{tid}`)
-- Default value is `'ibm_garage_user'`, so localStorage stores token at `localStorage['ibm_garage_user']`
+- Default value is `'session_token'`, so localStorage stores token at `localStorage['session_token']`
 
 ### SESSION_EXPIRY_KEY
 

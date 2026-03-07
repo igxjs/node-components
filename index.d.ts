@@ -29,6 +29,8 @@ export interface SessionConfig {
   SESSION_COOKIE_PATH?: string;
   SESSION_SECRET?: string;
   SESSION_PREFIX?: string;
+  SESSION_KEY?: string;
+  SESSION_EXPIRY_KEY?: string;
 
   REDIS_URL?: string;
   REDIS_CERT_PATH?: string;
