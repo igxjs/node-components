@@ -11,6 +11,7 @@ import { RedisStore } from 'connect-redis';
 import { CustomError, httpCodes, httpHelper, httpMessages } from './http-handlers.js';
 import { JwtManager } from './jwt.js';
 import { RedisManager } from './redis.js';
+import { Logger } from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -119,6 +120,8 @@ export class SessionManager {
   #idpRequest = null;
   /** @type {import('./jwt.js').JwtManager} */
   #jwtManager = null;
+  /** @type {import('./logger.js').Logger} */
+  #logger = Logger.getInstance('SessionManager');
 
   /**
    * Create a new session manager
@@ -252,7 +255,7 @@ export class SessionManager {
       ttlSeconds,
       JSON.stringify(user)
     );
-    console.debug(`### TOKEN GENERATED: ${user.email} ###`);
+    this.#logger.debug(`### TOKEN GENERATED: ${user.email} ###`);
     return token;
   }
 
@@ -269,6 +272,7 @@ export class SessionManager {
     try {
       // Extract token from Authorization header
       const authHeader = req.headers.authorization;
+      this.#logger.debug('authHeader->', authHeader);
       if (!authHeader?.startsWith('Bearer ')) {
         throw new CustomError(httpCodes.UNAUTHORIZED, 'Missing or invalid authorization header');
       }
@@ -309,7 +313,7 @@ export class SessionManager {
 
     } catch (error) {
       if (isDebugging) {
-        console.warn('### TOKEN VERIFICATION FAILED (debugging mode) ###', error.message);
+        this.#logger.warn('### TOKEN VERIFICATION FAILED (debugging mode) ###', error.message);
         return next();
       }
 
@@ -410,7 +414,7 @@ export class SessionManager {
       const oldRedisKey = this.#getTokenRedisKey(email, oldTokenId);
       await this.#redisManager.getClient().del(oldRedisKey);
 
-      console.debug('### TOKEN REFRESHED SUCCESSFULLY ###');
+      this.#logger.debug('### TOKEN REFRESHED SUCCESSFULLY ###');
 
       // Return new token
       return res.json({
@@ -484,7 +488,7 @@ export class SessionManager {
         await this.#redisManager.getClient().del(keys);
       }
 
-      console.info(`### ALL TOKENS LOGGED OUT: ${email} (${keys.length} tokens) ###`);
+      this.#logger.info(`### ALL TOKENS LOGGED OUT: ${email} (${keys.length} tokens) ###`);
 
       if (isRedirect) {
         return res.redirect(this.#config.SSO_SUCCESS_URL);
@@ -495,7 +499,7 @@ export class SessionManager {
         redirect_url: this.#config.SSO_SUCCESS_URL
       });
     } catch (error) {
-      console.error('### LOGOUT ALL TOKENS ERROR ###', error);
+      this.#logger.error('### LOGOUT ALL TOKENS ERROR ###', error);
       if (isRedirect) {
         return res.redirect(this.#config.SSO_FAILURE_URL);
       }
@@ -536,7 +540,7 @@ export class SessionManager {
       const redisKey = this.#getTokenRedisKey(email, tid);
       await this.#redisManager.getClient().del(redisKey);
 
-      console.info('### TOKEN LOGOUT SUCCESSFULLY ###');
+      this.#logger.info('### TOKEN LOGOUT SUCCESSFULLY ###');
 
       if (isRedirect) {
         return res.redirect(this.#config.SSO_SUCCESS_URL);
@@ -547,7 +551,7 @@ export class SessionManager {
       });
 
     } catch (error) {
-      console.error('### TOKEN LOGOUT ERROR ###', error);
+      this.#logger.error('### TOKEN LOGOUT ERROR ###', error);
       if (isRedirect) {
         return res.redirect(this.#config.SSO_FAILURE_URL);
       }
@@ -569,16 +573,16 @@ export class SessionManager {
     try {
       res.clearCookie('connect.sid');
     } catch (error) {
-      console.error('### CLEAR COOKIE ERROR ###');
-      console.error(error);
+      this.#logger.error('### CLEAR COOKIE ERROR ###');
+      this.#logger.error(error);
     }
     return req.session.destroy((sessionError) => {
       if (sessionError) {
-        console.error('### SESSION DESTROY CALLBACK ERROR ###');
-        console.error(sessionError);
+        this.#logger.error('### SESSION DESTROY CALLBACK ERROR ###');
+        this.#logger.error(sessionError);
         return callback(sessionError);
       }
-      console.info('### SESSION LOGOUT SUCCESSFULLY ###');
+      this.#logger.info('### SESSION LOGOUT SUCCESSFULLY ###');
       return callback(null);
     });
   }
@@ -607,7 +611,7 @@ export class SessionManager {
    */
   #redisSession() {
     // Redis Session
-    console.log('### Using Redis as the Session Store ###');
+    this.#logger.log('### Using Redis as the Session Store ###');
     return session({
       cookie: { maxAge: this.#config.SESSION_AGE, path: this.#config.SESSION_COOKIE_PATH, sameSite: false },
       store: new RedisStore({ client: this.#redisManager.getClient(), prefix: this.#config.SESSION_PREFIX, disableTouch: true }),
@@ -622,7 +626,7 @@ export class SessionManager {
    */
   #memorySession() {
     // Memory Session
-    console.log('### Using Memory as the Session Store ###');
+    this.#logger.log('### Using Memory as the Session Store ###');
     const MemoryStore = memStore(session);
     return session({
       cookie: { maxAge: this.#config.SESSION_AGE, path: this.#config.SESSION_COOKIE_PATH, sameSite: false },
@@ -709,13 +713,13 @@ export class SessionManager {
     /** @type {{ payload: { user: import('../models/types/user').UserModel, redirect_url: string } }} */
     const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
     if (payload?.user) {
-      console.debug('### CALLBACK USER ###');
+      this.#logger.debug('### CALLBACK USER ###');
       request.session[this.#getSessionKey()] = initUser(payload.user);
       return new Promise((resolve, reject) => {
         request.session.touch().save((err) => {
           if (err) {
-            console.error('### SESSION SAVE ERROR ###');
-            console.error(err);
+            this.#logger.error('### SESSION SAVE ERROR ###');
+            this.#logger.error(err);
             return reject(new CustomError(httpCodes.SYSTEM_FAILURE,  'Session failed to save', err));
           }
           return resolve(payload);
@@ -755,7 +759,7 @@ export class SessionManager {
           // Token-based: Generate token and return HTML page that stores it
           const token = await this.#generateAndStoreToken(user);
 
-          console.debug('### CALLBACK TOKEN GENERATED ###');
+          this.#logger.debug('### CALLBACK TOKEN GENERATED ###');
 
           // Return HTML page that stores token in localStorage and redirects
           const template = fs.readFileSync(path.resolve(__dirname, 'assets', 'template.html'), 'utf8');
@@ -773,7 +777,7 @@ export class SessionManager {
         return res.redirect(redirectUrl);
       }
       catch (error) {
-        console.error('### CALLBACK ERROR ###', error);
+        this.#logger.error('### CALLBACK ERROR ###', error);
         return res.redirect(this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(error.message)));
       }
     };
@@ -836,8 +840,8 @@ export class SessionManager {
       // Session-based authentication is already single-instance per cookie
       return this.#logoutSession(req, res, (error) => {
         if (error) {
-          console.error('### LOGOUT CALLBACK ERROR ###');
-          console.error(error);
+          this.#logger.error('### LOGOUT CALLBACK ERROR ###');
+          this.#logger.error(error);
           if (isRedirect) {
             return res.redirect(this.#config.SSO_FAILURE_URL);
           }

@@ -1,8 +1,12 @@
 import fs from 'node:fs';
 
 import { createClient } from '@redis/client';
+import { Logger } from './logger.js';
 
 export class RedisManager {
+  /** @type {Logger} */
+  #logger = Logger.getInstance('RedisManager');
+
   /** @type {import('@redis/client').RedisClientType} */
   #client = null;
   /**
@@ -22,21 +26,23 @@ export class RedisManager {
           options.socket.ca = caCert;
         }
         this.#client = createClient(options);
+        this.#logger.info('### REDIS CONNECTING ###');
         this.#client.on('ready', () => {
-          console.info('### REDIS READY ###');
+          this.#logger.info('### REDIS READY ###');
         });
         this.#client.on('reconnecting', (_res) => {
-          console.warn('### REDIS RECONNECTING ###');
+          this.#logger.warn('### REDIS RECONNECTING ###');
         });
         this.#client.on('error', (error) => {
-          console.error(`### REDIS ERROR: ${error.message} ###`);
+          this.#logger.error(`### REDIS ERROR: ${error.message} ###`);
         });
         await this.#client.connect();
+        this.#logger.info('### REDIS CONNECTED SUCCESSFULLY ###');
         return true;
       }
       catch (error) {
-        console.error('### REDIS CONNECT ERROR ###');
-        console.error(error);
+        this.#logger.error('### REDIS CONNECT ERROR ###', error);
+        return false;
       }
     }
     return false;
@@ -60,8 +66,8 @@ export class RedisManager {
         const pongMessage = await this.#client.ping();
         return 'PONG' === pongMessage;
       } catch (error) {
-        console.error(`### REDIS PING ERROR ###`);
-        console.error(error);
+        this.#logger.error(`### REDIS PING ERROR: ${error.message} ###`);
+        return false;
       }
     return false;
   }
@@ -70,7 +76,9 @@ export class RedisManager {
    * Disconnect with Redis
    * @returns {Promise<void>} Returns nothing
    */
-  disConnect() {
-    return this.#client.quit();
+  async disConnect() {
+    this.#logger.info('### REDIS DISCONNECTING ###');
+    await this.#client.quit();
+    this.#logger.info('### REDIS DISCONNECTED ###');
   }
 }

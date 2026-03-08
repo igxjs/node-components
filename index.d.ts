@@ -7,6 +7,70 @@ import { Application, RequestHandler, Request, Response, NextFunction, Router } 
 
 export { JWTPayload } from 'jose';
 
+// Logger class for configurable logging
+export class Logger {
+  /**
+   * Get or create a Logger instance (singleton pattern)
+   * @param componentName Component name for log prefix
+   * @param enableLogging Enable/disable logging (defaults to NODE_ENV !== 'production')
+   * @returns Logger instance
+   */
+  static getInstance(componentName: string, enableLogging?: boolean): Logger;
+
+  /**
+   * Clear all logger instances (useful for testing)
+   */
+  static clearInstances(): void;
+
+  /**
+   * Disable colors globally for all logger instances
+   */
+  static disableColors(): void;
+
+  /**
+   * Enable colors globally for all logger instances
+   */
+  static enableColors(): void;
+
+  /**
+   * Create a new Logger instance (backward compatibility)
+   * Note: Use Logger.getInstance() for singleton pattern
+   * @param componentName Component name for log prefix
+   * @param enableLogging Enable/disable logging (defaults to NODE_ENV !== 'production')
+   */
+  constructor(componentName: string, enableLogging?: boolean);
+
+  /**
+   * Log debug message
+   * @param args Arguments to log
+   */
+  debug(...args: any[]): void;
+
+  /**
+   * Log info message
+   * @param args Arguments to log
+   */
+  info(...args: any[]): void;
+
+  /**
+   * Log warning message
+   * @param args Arguments to log
+   */
+  warn(...args: any[]): void;
+
+  /**
+   * Log error message
+   * @param args Arguments to log
+   */
+  error(...args: any[]): void;
+
+  /**
+   * Log general message
+   * @param args Arguments to log
+   */
+  log(...args: any[]): void;
+}
+
 // Session Mode constants
 export const SessionMode: {
   SESSION: string;

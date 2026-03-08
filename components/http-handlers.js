@@ -1,20 +1,11 @@
 import { STATUS_CODES } from 'node:http';
+import { Logger } from './logger.js';
 
-export const httpMessages = {
-  OK: 'OK',
-  CREATED: 'Created',
-  NO_CONTENT: 'No Content',
-  BAD_REQUEST: 'Bad Request',
-  UNAUTHORIZED: 'Unauthorized',
-  FORBIDDEN: 'Forbidden',
-  NOT_FOUND: 'Not Found',
-  NOT_ACCEPTABLE: 'Not Acceptable',
-  CONFLICT: 'Conflict',
-  LOCKED: 'Locked',
-  SYSTEM_FAILURE: 'System Error',
-  NOT_IMPLEMENTED: 'Not Implemented',
-};
+const logger = Logger.getInstance('httpError');
 
+/**
+ * HTTP status codes
+ */
 export const httpCodes = {
   OK: 200,
   CREATED: 201,
@@ -30,23 +21,45 @@ export const httpCodes = {
   NOT_IMPLEMENTED: 501,
 };
 
+/**
+ * HTTP status messages
+ */
+export const httpMessages = {
+  OK: 'OK',
+  CREATED: 'Created',
+  NO_CONTENT: 'No Content',
+  BAD_REQUEST: 'Bad Request',
+  UNAUTHORIZED: 'Unauthorized',
+  FORBIDDEN: 'Forbidden',
+  NOT_FOUND: 'Not Found',
+  NOT_ACCEPTABLE: 'Not Acceptable',
+  CONFLICT: 'Conflict',
+  LOCKED: 'Locked',
+  SYSTEM_FAILURE: 'Internal Server Error',
+  NOT_IMPLEMENTED: 'Not Implemented',
+};
+
+/**
+ * Custom Error class
+ */
 export class CustomError extends Error {
-  /** @type {number} */
-  code;
-  /** @type {object} */
-  data;
-  /** @type {object} */
-  error;
   /**
-   * Construct a custom error
-   * @param {number} code Error code
-   * @param {string} message Message
+   * @param {number} code HTTP status code
+   * @param {string} message Error message
+   * @param {Error} [error] Original error object
+   * @param {object} [data] Additional error data
    */
-  constructor(code, message, error = {}, data = {}) {
+  constructor(code, message, error, data) {
     super(message);
+    this.name = 'CustomError';
     this.code = code;
     this.error = error;
     this.data = data;
+
+    // Maintains proper stack trace for where our error was thrown (only available on V8)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, CustomError);
+    }
   }
 }
 
@@ -85,21 +98,21 @@ export const httpErrorHandler = (err, req, res, next) => {
   res.status(responseBody.status).json(responseBody);
 
   // Log error details
-  console.error('### ERROR ###');
-  console.error(`${req.method} ${req.path}`);
+  logger.error('### ERROR ###');
+  logger.error(`${req.method} ${req.path}`);
 
   // Log based on error type
   if ([httpCodes.UNAUTHORIZED, httpCodes.FORBIDDEN, httpCodes.NOT_FOUND].includes(err.code)) {
-    console.error('>>> Auth Error:', err.message);
+    logger.error('>>> Auth Error:', err.message);
   } else {
-    console.error('>>> Name:', err.name);
-    console.error('>>> Message:', err.message);
+    logger.error('>>> Name:', err.name);
+    logger.error('>>> Message:', err.message);
     if (err.stack) {
-      console.error('>>> Stack:', err.stack);
+      logger.error('>>> Stack:', err.stack);
     }
   }
 
-  console.error('### /ERROR ###');
+  logger.error('### /ERROR ###');
 };
 
 /**
@@ -177,7 +190,7 @@ export const httpHelper = {
    * @returns {CustomError} Returns CustomError instance
    */
   handleAxiosError(error, defaultMessage = 'An error occurred') {
-    console.warn(`### TRY ERROR: ${defaultMessage} ###`);
+    logger.warn(`### TRY ERROR: ${defaultMessage} ###`);
     // Extract error details
     const errorCode = _getErrorCode(error);
     const errorMessage = _getErrorMessage(error, defaultMessage);

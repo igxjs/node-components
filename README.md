@@ -13,6 +13,7 @@ npm install @igxjs/node-components
 | Component | Description | Documentation |
 |-----------|-------------|---------------|
 | **SessionManager** | SSO session management with Redis/memory storage, supporting both session and token-based authentication | [View docs](./docs/session-manager.md) |
+| **Logger** | High-performance logging utility with zero dependencies and smart color detection | [View docs](./docs/logger.md) |
 | **FlexRouter** | Flexible routing with context paths and middleware | [View docs](./docs/flex-router.md) |
 | **RedisManager** | Redis connection management with TLS support | [View docs](./docs/redis-manager.md) |
 | **JWT Manager** | Secure JWT encryption/decryption with JWE | [View docs](./docs/jwt-manager.md) |
@@ -76,10 +77,11 @@ flexRouter.mount(app, '');
 ```javascript
 import { JwtManager } from '@igxjs/node-components';
 
-const jwt = new JwtManager({ expirationTime: '1h' });
+// Constructor uses UPPERCASE naming with JWT_ prefix
+const jwt = new JwtManager({ JWT_EXPIRATION_TIME: '1h' });
 const SECRET = process.env.JWT_SECRET;
 
-// Create token
+// Create token (encrypt method uses camelCase for per-call options)
 const token = await jwt.encrypt({ userId: '123', email: 'user@example.com' }, SECRET);
 
 // Verify token
@@ -154,22 +156,22 @@ Uses JWT bearer tokens instead of session cookies. When a user authenticates via
 
 **Token Storage (Client-Side):**
 
-When using token-based authentication, the client-side HTML page stores the token in `localStorage`:
+When using token-based authentication, the SSO callback returns an HTML page that stores the token in `localStorage` and redirects the user:
 
-```html
-<script>
-  // Store auth data in localStorage
-  localStorage.setItem('authToken', ${JSON.stringify(token)});
-  localStorage.setItem('tokenExpiry', ${Date.now() + sessionAge});
-  localStorage.setItem('user', ${JSON.stringify({
-    email: user.email,
-    name: user.name,
-  })});
-  
-  // Redirect to original destination
-  window.location.replace(redirectUrl);
-</script>
+```javascript
+// The token is automatically stored in localStorage by the callback HTML page
+// Default keys (customizable via SESSION_KEY and SESSION_EXPIRY_KEY config):
+localStorage.getItem('session_token');        // JWT token
+localStorage.getItem('session_expires_at');   // Expiry timestamp
+
+// Making authenticated requests from the client:
+const token = localStorage.getItem('session_token');
+fetch('/api/protected', {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
 ```
+
+**Note:** The actual localStorage keys used are determined by the `SESSION_KEY` and `SESSION_EXPIRY_KEY` configuration options (defaults shown above).
 
 ## SessionManager Configuration Options
 

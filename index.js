@@ -3,3 +3,4 @@ export { httpCodes, httpMessages, httpErrorHandler, httpNotFoundHandler, CustomE
 export { RedisManager } from './components/redis.js';
 export { FlexRouter } from './components/router.js';
 export { JwtManager } from './components/jwt.js';
+export { Logger } from './components/logger.js';
