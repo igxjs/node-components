@@ -21,7 +21,7 @@ Constructor options use `JWT_` prefix with UPPERCASE naming convention:
 const jwtOptions = {
   JWT_ALGORITHM: 'dir',              // JWE algorithm (default: 'dir')
   JWT_ENCRYPTION: 'A256GCM',         // JWE encryption method (default: 'A256GCM')
-  JWT_EXPIRATION_TIME: '10m',        // Token expiration (default: '10m')
+  SESSION_AGE: 64800000,             // Token expiration time in milliseconds (default: 64800000 = 18 hours)
   JWT_CLOCK_TOLERANCE: 30,           // Clock tolerance in seconds (default: 30)
   JWT_SECRET_HASH_ALGORITHM: 'SHA-256', // Hash algorithm for secret derivation (default: 'SHA-256')
   JWT_ISSUER: 'your-app',            // Optional JWT issuer claim
@@ -29,6 +29,8 @@ const jwtOptions = {
   JWT_SUBJECT: 'user-session'        // Optional JWT subject claim
 };
 ```
+
+**Note:** `SESSION_AGE` is specified in **milliseconds** (consistent with session management), but internally converted to seconds for JWT expiration as required by the jose library.
 
 ### encrypt() Method Options
 
@@ -38,8 +40,7 @@ Per-call encryption options use camelCase naming convention:
 const encryptOptions = {
   algorithm: 'dir',              // JWE algorithm (overrides constructor default)
   encryption: 'A256GCM',         // JWE encryption method
-  expirationTime: '1h',          // Token expiration time
-  clockTolerance: 30,            // Clock tolerance for validation
+  expirationTime: 3600,          // Token expiration time in seconds (overrides instance default)
   secretHashAlgorithm: 'SHA-256' // Hash algorithm for secret derivation
 };
 
@@ -47,6 +48,8 @@ const encryptOptions = {
 encryptOptions.issuer = 'my-app';
 encryptOptions.audience = 'my-users';
 ```
+
+**Note:** The `expirationTime` in the encrypt method options is specified in **seconds** (as required by jose library), while `SESSION_AGE` in constructor options is in milliseconds.
 
 ### decrypt() Method Options
 
@@ -68,7 +71,7 @@ import { JwtManager } from '@igxjs/node-components';
 
 // Create instance with default configuration using constructor options (JWT_ prefix)
 const jwtManager = new JwtManager({
-  JWT_EXPIRATION_TIME: '1h',
+  SESSION_AGE: 3600000,
   JWT_ISSUER: 'my-app',
   JWT_AUDIENCE: 'my-users'
 });
@@ -89,7 +92,7 @@ console.log('Encrypted Token:', token);
 
 // Encrypt with custom per-call options (camelCase)
 const shortExpiryToken = await jwtManager.encrypt(userData, secret, {
-  expirationTime: '1m',        // Override default expiration time
+  expirationTime: 3600,         // Override default expiration time
   issuer: 'temporary-issuer'    // Temporary issuer for this token
 });
 

@@ -13,7 +13,7 @@ export class JwtManager {
   /** @type {string} Encryption method */
   encryption;
   
-  /** @type {string} Token expiration time */
+  /** @type {number} Token expiration time */
   expirationTime;
   
   /** @type {number} Clock tolerance in seconds */
@@ -37,7 +37,7 @@ export class JwtManager {
    * @typedef {Object} JwtManagerOptions JwtManager configuration options
    * @property {string} [JWT_ALGORITHM='dir'] JWE algorithm (default: 'dir')
    * @property {string} [JWT_ENCRYPTION='A256GCM'] Encryption method (default: 'A256GCM')
-   * @property {string} [JWT_EXPIRATION_TIME='10m'] Token expiration time (default: '10m')
+   * @property {number} [SESSION_AGE=64800000] Token expiration time in milliseconds (default: 64800000 = 18 hours)
    * @property {string} [JWT_SECRET_HASH_ALGORITHM='SHA-256'] Hash algorithm (default: 'SHA-256')
    * @property {string?} [JWT_ISSUER] Optional JWT issuer claim
    * @property {string?} [JWT_AUDIENCE] Optional JWT audience claim
@@ -48,7 +48,8 @@ export class JwtManager {
   constructor(options = {}) {
     this.algorithm = options.JWT_ALGORITHM || 'dir';
     this.encryption = options.JWT_ENCRYPTION || 'A256GCM';
-    this.expirationTime = options.JWT_EXPIRATION_TIME || '10m';
+    // SESSION_AGE is in milliseconds, convert to seconds for expirationTime
+    this.expirationTime = Math.floor((options.SESSION_AGE || 64800000) / 1000);
     this.secretHashAlgorithm = options.JWT_SECRET_HASH_ALGORITHM || 'SHA-256';
     this.issuer = options.JWT_ISSUER;
     this.audience = options.JWT_AUDIENCE;
@@ -62,7 +63,7 @@ export class JwtManager {
    * @typedef {Object} JwtEncryptOptions Encryption method options
    * @property {string} [algorithm='dir'] JWE algorithm (overrides instance JWT_ALGORITHM)
    * @property {string} [encryption='A256GCM'] Encryption method (overrides instance JWT_ENCRYPTION)
-   * @property {string} [expirationTime='10m'] Token expiration time (overrides instance JWT_EXPIRATION_TIME)
+   * @property {number} [expirationTime] Token expiration time in seconds (overrides instance expirationTime derived from SESSION_AGE)
    * @property {string} [secretHashAlgorithm='SHA-256'] Hash algorithm for secret derivation (overrides instance JWT_SECRET_HASH_ALGORITHM)
    * @property {string?} [issuer] Optional JWT issuer claim (overrides instance JWT_ISSUER)
    * @property {string?} [audience] Optional JWT audience claim (overrides instance JWT_AUDIENCE)
@@ -97,7 +98,7 @@ export class JwtManager {
         typ: 'JWT',
       })
       .setIssuedAt()
-      .setExpirationTime(expirationTime);
+      .setExpirationTime(`${expirationTime}s`); // Pass as string with 's' suffix for seconds
 
     // Add optional claims if provided
     if (issuer) jwt.setIssuer(issuer);

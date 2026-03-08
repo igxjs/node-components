@@ -54,7 +54,6 @@ const config = {
   // JWT Configuration (used internally by SessionManager for TOKEN mode)
   JWT_ALGORITHM: 'dir',                 // Default: 'dir'
   JWT_ENCRYPTION: 'A256GCM',            // Default: 'A256GCM'
-  JWT_EXPIRATION_TIME: '10m',           // Default: '10m'
   JWT_CLOCK_TOLERANCE: 30,              // Default: 30 seconds
   JWT_SECRET_HASH_ALGORITHM: 'SHA-256', // Default: 'SHA-256'
   JWT_ISSUER: 'your-app',               // Optional
@@ -86,7 +85,6 @@ const config = {
 | `REDIS_CERT_PATH` | string | No | - | Path to Redis TLS certificate file (optional for TLS connections) |
 | `JWT_ALGORITHM` | string | No | `'dir'` | JWE algorithm |
 | `JWT_ENCRYPTION` | string | No | `'A256GCM'` | JWE encryption method |
-| `JWT_EXPIRATION_TIME` | string | No | `'10m'` | Token expiration duration |
 | `JWT_CLOCK_TOLERANCE` | number | No | 30 | Clock skew tolerance in seconds |
 | `JWT_SECRET_HASH_ALGORITHM` | string | No | `'SHA-256'` | Algorithm for hashing secrets |
 | `JWT_ISSUER` | string | No | - | JWT issuer identifier |
@@ -199,7 +197,6 @@ export const session = new SessionManager({
   SESSION_KEY: 'session_token',      // LocalStorage key name for JWT token (default)
   SESSION_EXPIRY_KEY: 'session_expires_at',  // LocalStorage key name for expiry timestamp (default)
   REDIS_URL: process.env.REDIS_URL,  // Required for TOKEN mode
-  JWT_EXPIRATION_TIME: '1h'
 });
 ```
 
@@ -582,7 +579,7 @@ const session = new SessionManager({
   SESSION_MODE: SessionMode.TOKEN,
   SSO_SUCCESS_URL: '/dashboard',
   SSO_FAILURE_URL: '/login',
-  JWT_EXPIRATION_TIME: '1h'
+  SESSION_AGE: 3600000
 });
 ```
 

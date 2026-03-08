@@ -78,7 +78,7 @@ flexRouter.mount(app, '');
 import { JwtManager } from '@igxjs/node-components';
 
 // Constructor uses UPPERCASE naming with JWT_ prefix
-const jwt = new JwtManager({ JWT_EXPIRATION_TIME: '1h' });
+const jwt = new JwtManager({ SESSION_AGE: 64800000 });
 const SECRET = process.env.JWT_SECRET;
 
 // Create token (encrypt method uses camelCase for per-call options)
@@ -145,7 +145,6 @@ Uses JWT bearer tokens instead of session cookies. When a user authenticates via
 - `SSO_FAILURE_URL`: Redirect URL after failed SSO login  
 - `JWT_ALGORITHM`: JWT algorithm (default: `'dir'`)
 - `JWT_ENCRYPTION`: Encryption algorithm (default: `'A256GCM'`)
-- `JWT_EXPIRATION_TIME`: Token expiration time (default: `'10m'`)
 - `JWT_CLOCK_TOLERANCE`: Clock skew tolerance in seconds (default: 30)
 
 **Auth Methods:**
@@ -191,7 +190,6 @@ fetch('/api/protected', {
 | `REDIS_CERT_PATH` | string | - | Path to Redis TLS certificate |
 | `JWT_ALGORITHM` | string | `'dir'` | JWT signing algorithm |
 | `JWT_ENCRYPTION` | string | `'A256GCM'` | JWE encryption algorithm |
-| `JWT_EXPIRATION_TIME` | string | `'10m'` | Token expiration duration |
 | `JWT_CLOCK_TOLERANCE` | number | 30 | Clock skew tolerance in seconds |
 | `JWT_SECRET_HASH_ALGORITHM` | string | `'SHA-256'` | Algorithm for hashing secrets |
 | `JWT_ISSUER` | string | - | JWT issuer identifier |

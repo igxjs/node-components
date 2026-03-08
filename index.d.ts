@@ -101,7 +101,6 @@ export interface SessionConfig {
 
   JWT_ALGORITHM?: string;
   JWT_ENCRYPTION?: string;
-  JWT_EXPIRATION_TIME?: string;
   JWT_CLOCK_TOLERANCE?: number;
   JWT_SECRET_HASH_ALGORITHM?: string;
   JWT_ISSUER?: string;
@@ -314,25 +313,22 @@ export class RedisManager {
 export interface JwtManagerOptions {
   /** JWE algorithm (default: 'dir') */
   JWT_ALGORITHM?: string;
-  
+
   /** JWE encryption method (default: 'A256GCM') */
   JWT_ENCRYPTION?: string;
-  
-  /** Token expiration time (default: '10m') */
-  JWT_EXPIRATION_TIME?: string;
-  
+
   /** Clock tolerance in seconds for token validation (default: 30) */
   JWT_CLOCK_TOLERANCE?: number;
-  
+
   /** Hash algorithm for secret derivation (default: 'SHA-256') */
   JWT_SECRET_HASH_ALGORITHM?: string;
-  
+
   /** Optional JWT issuer claim */
   JWT_ISSUER?: string;
-  
+
   /** Optional JWT audience claim */
   JWT_AUDIENCE?: string;
-  
+
   /** Optional JWT subject claim */
   JWT_SUBJECT?: string;
 }
@@ -348,7 +344,7 @@ export interface JwtEncryptOptions {
   encryption?: string;
 
   /** Override default expiration time */
-  expirationTime?: string;
+  expirationTime?: number;
 
   /** Override default hash algorithm */
   secretHashAlgorithm?: string;
@@ -389,7 +385,7 @@ export type JwtDecryptResult = JWTDecryptResult<EncryptJWT>;
 export class JwtManager {
   algorithm: string;
   encryption: string;
-  expirationTime: string;
+  expirationTime: number;
   clockTolerance: number;
   secretHashAlgorithm: string;
   issuer?: string;

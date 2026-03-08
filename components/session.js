@@ -45,7 +45,7 @@ export class SessionConfig {
   /** @type {string} */
   SSO_FAILURE_URL;
 
-  /** @type {number} Session age in seconds */
+  /** @type {number} Session age in milliseconds */
   SESSION_AGE;
   /**
    * @type {string} Session cookie path
@@ -86,11 +86,6 @@ export class SessionConfig {
    * @default 'A256GCM'
    */
   JWT_ENCRYPTION;
-  /**
-   * @type {string} Expiration time of the JWT
-   * @default '10m'
-   */
-  JWT_EXPIRATION_TIME;
   /**
    * @type {number} Clock tolerance in seconds
    * @default 30
@@ -150,7 +145,6 @@ export class SessionManager {
       // JWT Manager
       JWT_ALGORITHM: config.JWT_ALGORITHM || 'dir',
       JWT_ENCRYPTION: config.JWT_ENCRYPTION || 'A256GCM',
-      JWT_EXPIRATION_TIME: config.JWT_EXPIRATION_TIME || '10m',
       JWT_CLOCK_TOLERANCE: config.JWT_CLOCK_TOLERANCE ?? 30,
       JWT_SECRET_HASH_ALGORITHM: config.JWT_SECRET_HASH_ALGORITHM || 'SHA-256',
       JWT_ISSUER: config.JWT_ISSUER,
@@ -272,7 +266,6 @@ export class SessionManager {
     try {
       // Extract token from Authorization header
       const authHeader = req.headers.authorization;
-      this.#logger.debug('authHeader->', authHeader);
       if (!authHeader?.startsWith('Bearer ')) {
         throw new CustomError(httpCodes.UNAUTHORIZED, 'Missing or invalid authorization header');
       }
@@ -671,7 +664,6 @@ export class SessionManager {
   authenticate(isDebugging = false, redirectUrl = '') {
     return async (req, res, next) => {
       const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
-      this.#logger.debug(`Session mode: ${mode}`);
       if (mode === SessionMode.TOKEN) {
         return this.#verifyToken(req, res, next, isDebugging, redirectUrl);
       }

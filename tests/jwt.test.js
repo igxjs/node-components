@@ -21,7 +21,7 @@ describe('JwtManager', () => {
       expect(manager).to.be.instanceOf(JwtManager);
       expect(manager.algorithm).to.equal('dir');
       expect(manager.encryption).to.equal('A256GCM');
-      expect(manager.expirationTime).to.equal('10m');
+      expect(manager.expirationTime).to.equal(64800); // 64800000ms / 1000 = 64800 seconds
       expect(manager.clockTolerance).to.equal(30);
       expect(manager.secretHashAlgorithm).to.equal('SHA-256');
     });
@@ -30,7 +30,7 @@ describe('JwtManager', () => {
       const options = {
         JWT_ALGORITHM: 'A128KW',
         JWT_ENCRYPTION: 'A128GCM',
-        JWT_EXPIRATION_TIME: '1h',
+        SESSION_AGE: 3600000, // 1 hour in milliseconds
         JWT_CLOCK_TOLERANCE: 60,
         JWT_SECRET_HASH_ALGORITHM: 'SHA-512',
         JWT_ISSUER: 'test-issuer',
@@ -40,7 +40,7 @@ describe('JwtManager', () => {
       const manager = new JwtManager(options);
       expect(manager.algorithm).to.equal('A128KW');
       expect(manager.encryption).to.equal('A128GCM');
-      expect(manager.expirationTime).to.equal('1h');
+      expect(manager.expirationTime).to.equal(3600); // 3600000ms / 1000 = 3600 seconds
       expect(manager.clockTolerance).to.equal(60);
       expect(manager.secretHashAlgorithm).to.equal('SHA-512');
       expect(manager.issuer).to.equal('test-issuer');
@@ -71,7 +71,7 @@ describe('JwtManager', () => {
 
     it('should encrypt with custom expiration time (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
-        expirationTime: '1h'
+        expirationTime: 3600
       });
       expect(token).to.be.a('string');
     });
@@ -156,7 +156,7 @@ describe('JwtManager', () => {
 
     it('should decrypt token with custom clock tolerance (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
-        expirationTime: '1s'
+        expirationTime: 1
       });
       
       // Use higher clock tolerance to allow slightly expired tokens
