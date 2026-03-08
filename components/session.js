@@ -226,6 +226,8 @@ export class SessionManager {
 
   /**
    * Generate and store JWT token in Redis
+   * - JWT payload contains only { email, tid } for minimal size
+   * - Full user data is stored in Redis as single source of truth
    * @param {object} user User object
    * @returns {Promise<string>} Returns the generated JWT token
    * @private
@@ -234,9 +236,9 @@ export class SessionManager {
     // Generate unique token ID for this device/session
     const tid = crypto.randomUUID();
     const ttlSeconds = Math.floor(this.#config.SESSION_AGE / 1000);
-    // Create JWT token with email and tid
+    // Create JWT token with only email and tid (minimal payload)
     const token = await this.#jwtManager.encrypt(
-      { tid, user },
+      { email: user.email, tid },
       this.#config.SESSION_SECRET,
       { expirationTime: ttlSeconds }
     );
@@ -366,7 +368,7 @@ export class SessionManager {
       const authHeader = req.headers.authorization;
       const token = authHeader?.substring(7);
       const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
-      const oldTokenId = payload.tid;
+      const { tid: oldTokenId } = payload;
 
       // Check refresh lock
       if (this.hasLock(email)) {
@@ -528,6 +530,10 @@ export class SessionManager {
 
       const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
       const { email, tid } = payload;
+
+      if (!email || !tid) {
+        throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid token payload');
+      }
 
       // Remove token from Redis
       const redisKey = this.#getTokenRedisKey(email, tid);
