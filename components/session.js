@@ -671,6 +671,7 @@ export class SessionManager {
   authenticate(isDebugging = false, redirectUrl = '') {
     return async (req, res, next) => {
       const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
+      this.#logger.debug(`Session mode: ${mode}`);
       if (mode === SessionMode.TOKEN) {
         return this.#verifyToken(req, res, next, isDebugging, redirectUrl);
       }
