@@ -76,7 +76,7 @@ export class RedisManager {
    * Disconnect with Redis
    * @returns {Promise<void>} Returns nothing
    */
-  async disConnect() {
+  async disconnect() {
     this.#logger.info('### REDIS DISCONNECTING ###');
     await this.#client.quit();
     this.#logger.info('### REDIS DISCONNECTED ###');

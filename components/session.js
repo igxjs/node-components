@@ -72,6 +72,13 @@ export class SessionConfig {
    * @default 'session_expires_at'
    */
   SESSION_EXPIRY_KEY;
+  /**
+   * @type {string} Path to custom HTML template for TOKEN mode callback
+   * - Used to customize the redirect page that stores JWT token and expiry in localStorage
+   * - Supports placeholders: {{SESSION_DATA_KEY}}, {{SESSION_DATA_VALUE}}, {{SESSION_EXPIRY_KEY}}, {{SESSION_EXPIRY_VALUE}}, {{SSO_SUCCESS_URL}}, {{SSO_FAILURE_URL}}
+   * - If not provided, uses default template
+   */
+  TOKEN_STORAGE_TEMPLATE_PATH;
   /** @type {string} Redis URL */
   REDIS_URL;
   /** @type {string} Redis certificate path */
@@ -133,6 +140,8 @@ export class SessionManager {
       SESSION_PREFIX: config.SESSION_PREFIX || 'ibmid:',
       SESSION_KEY: config.SESSION_KEY || 'session_token',
       SESSION_EXPIRY_KEY: config.SESSION_EXPIRY_KEY || 'session_expires_at',
+      TOKEN_STORAGE_TEMPLATE_PATH: config.TOKEN_STORAGE_TEMPLATE_PATH,
+
       // Identity Provider
       SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
       SSO_CLIENT_ID: config.SSO_CLIENT_ID,
@@ -142,6 +151,7 @@ export class SessionManager {
       // Redis
       REDIS_URL: config.REDIS_URL,
       REDIS_CERT_PATH: config.REDIS_CERT_PATH,
+
       // JWT Manager
       JWT_ALGORITHM: config.JWT_ALGORITHM || 'dir',
       JWT_ENCRYPTION: config.JWT_ENCRYPTION || 'A256GCM',
@@ -760,14 +770,15 @@ export class SessionManager {
 
           this.#logger.debug('### CALLBACK TOKEN GENERATED ###');
 
+          const templatePath = this.#config.TOKEN_STORAGE_TEMPLATE_PATH || path.resolve(__dirname, 'assets', 'template.html');
           // Return HTML page that stores token in localStorage and redirects
-          const template = fs.readFileSync(path.resolve(__dirname, 'assets', 'template.html'), 'utf8');
+          const template = fs.readFileSync(templatePath, 'utf8');
           const html = template
             .replaceAll('{{SESSION_DATA_KEY}}', this.#config.SESSION_KEY)
             .replaceAll('{{SESSION_DATA_VALUE}}', token)
             .replaceAll('{{SESSION_EXPIRY_KEY}}', this.#config.SESSION_EXPIRY_KEY)
             .replaceAll('{{SESSION_EXPIRY_VALUE}}', user.attributes.expires_at)
-            .replaceAll('{{REDIRECT_URL}}', redirectUrl)
+            .replaceAll('{{SSO_SUCCESS_URL}}', redirectUrl)
             .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
           return res.send(html);
         }

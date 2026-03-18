@@ -95,6 +95,7 @@ export interface SessionConfig {
   SESSION_PREFIX?: string;
   SESSION_KEY?: string;
   SESSION_EXPIRY_KEY?: string;
+  TOKEN_STORAGE_TEMPLATE_PATH?: string;
 
   REDIS_URL?: string;
   REDIS_CERT_PATH?: string;
@@ -306,7 +307,7 @@ export class RedisManager {
    * Disconnect from Redis
    * @returns Returns nothing
    */
-  disConnect(): Promise<void>;
+  disconnect(): Promise<void>;
 }
 
 // JWT Manager Configuration - uses strict UPPERCASE naming convention with JWT_ prefix for all property names

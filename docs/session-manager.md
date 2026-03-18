@@ -46,6 +46,7 @@ const config = {
   SESSION_SECRET: 'your-session-secret',
   SESSION_KEY: 'session_token',        // Key name used to store user data (default)
   SESSION_EXPIRY_KEY: 'session_expires_at',  // LocalStorage key name for expiry timestamp (default)
+  TOKEN_STORAGE_TEMPLATE_PATH: '/path/to/custom-template.html',  // Optional: Custom HTML template for TOKEN mode
 
   // Redis Configuration (optional - uses memory store if not provided; Required for TOKEN mode)
   REDIS_URL: 'redis://localhost:6379',
@@ -80,6 +81,10 @@ const config = {
 |   |   |   |   | • TOKEN mode: LocalStorage key name for JWT token + prefix for Redis token storage |
 | `SESSION_EXPIRY_KEY` | string | No | `'session_expires_at'` | **LocalStorage key name for session expiry timestamp (TOKEN mode only)** |
 |   |   |   |   | • Stores the expires_at timestamp in browser's localStorage for client-side expiration checking |
+| `TOKEN_STORAGE_TEMPLATE_PATH` | string | No | Built-in template | **Path to custom HTML template for TOKEN mode callback** |
+|   |   |   |   | • Used to customize the redirect page that stores JWT token and expiry in localStorage |
+|   |   |   |   | • Supports placeholders: `{{SESSION_DATA_KEY}}`, `{{SESSION_DATA_VALUE}}`, `{{SESSION_EXPIRY_KEY}}`, `{{SESSION_EXPIRY_VALUE}}`, `{{SSO_SUCCESS_URL}}`, `{{SSO_FAILURE_URL}}` |
+|   |   |   |   | • If not provided, uses default built-in template |
 | `SESSION_PREFIX` | string | No | `'ibmid:'` | Redis key prefix (used by default when not provided) |
 | `REDIS_URL` | string | No | - | Redis connection URL (uses memory if not provided; **Required for TOKEN mode**) |
 | `REDIS_CERT_PATH` | string | No | - | Path to Redis TLS certificate file (optional for TLS connections) |
@@ -196,6 +201,7 @@ export const session = new SessionManager({
   SESSION_SECRET: process.env.SESSION_SECRET,  // JWT encryption key
   SESSION_KEY: 'session_token',      // LocalStorage key name for JWT token (default)
   SESSION_EXPIRY_KEY: 'session_expires_at',  // LocalStorage key name for expiry timestamp (default)
+  TOKEN_STORAGE_TEMPLATE_PATH: '/path/to/custom-template.html',  // Optional: Custom HTML template
   REDIS_URL: process.env.REDIS_URL,  // Required for TOKEN mode
 });
 ```

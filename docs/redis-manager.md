@@ -37,7 +37,7 @@ if (connected) {
   console.log('Connected:', isConnected);
   
   // Disconnect when done
-  await redisManager.disConnect();
+  await redisManager.disconnect();
 }
 ```
 
@@ -96,7 +96,7 @@ await client.setEx('temporary', 3600, 'expires in 1 hour');
 await client.expire('user:1', 3600);
 
 // Clean up
-await redisManager.disConnect();
+await redisManager.disconnect();
 ```
 
 ### Connection Monitoring
@@ -133,7 +133,7 @@ try {
 } catch (error) {
   console.error('Redis operation failed:', error);
 } finally {
-  await redisManager.disConnect();
+  await redisManager.disconnect();
 }
 ```
 
@@ -185,7 +185,7 @@ if (connected) {
 }
 ```
 
-### `disConnect()`
+### `disconnect()`
 
 Disconnect from Redis server and clean up resources.
 
@@ -193,7 +193,7 @@ Disconnect from Redis server and clean up resources.
 
 **Example:**
 ```javascript
-await redisManager.disConnect();
+await redisManager.disconnect();
 ```
 
 ## Features

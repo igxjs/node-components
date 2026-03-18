@@ -71,7 +71,7 @@
 <body>
   <hr />
   <div class="wrapper">
-    <div id="success">Redirecting... <a href="{{REDIRECT_URL}}" target="_blank" style="color: blue; text-decoration: underline;">(click here if not redirected)</a></div>
+    <div id="success">Redirecting... <a href="{{SSO_SUCCESS_URL}}" target="_blank" style="color: blue; text-decoration: underline;">(click here if not redirected)</a></div>
     <div id="failure">
       <p>Authentication failed. Please try again.</p>
       <a href="{{SSO_FAILURE_URL}}">Return to login</a>
@@ -95,7 +95,7 @@
       }
 
       // Fall back to simple navigation
-      location.href = '{{REDIRECT_URL}}';
+      location.href = '{{SSO_SUCCESS_URL}}';
     } catch (e) {
       console.error('Redirect failed:', e);
       success = false;
