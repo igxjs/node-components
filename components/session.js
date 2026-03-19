@@ -128,8 +128,43 @@ export class SessionManager {
   /**
    * Create a new session manager
    * @param {SessionConfig} config Session configuration
+   * @throws {TypeError} If config is not an object
+   * @throws {Error} If required configuration fields are missing
    */
   constructor(config) {
+    // Validate config is an object
+    if (!config || typeof config !== 'object') {
+      throw new TypeError('SessionManager configuration must be an object');
+    }
+
+    // Validate required fields based on SESSION_MODE
+    const mode = config.SESSION_MODE || SessionMode.SESSION;
+    
+    // SESSION_SECRET is always required for both modes
+    if (!config.SESSION_SECRET) {
+      throw new Error('SESSION_SECRET is required for SessionManager');
+    }
+
+    // Validate SSO configuration if SSO endpoints are used
+    if (config.SSO_ENDPOINT_URL) {
+      if (!config.SSO_CLIENT_ID) {
+        throw new Error('SSO_CLIENT_ID is required when SSO_ENDPOINT_URL is provided');
+      }
+      if (!config.SSO_CLIENT_SECRET) {
+        throw new Error('SSO_CLIENT_SECRET is required when SSO_ENDPOINT_URL is provided');
+      }
+    }
+
+    // Validate TOKEN mode specific requirements
+    if (mode === SessionMode.TOKEN) {
+      if (!config.SSO_SUCCESS_URL) {
+        throw new Error('SSO_SUCCESS_URL is required for TOKEN authentication mode');
+      }
+      if (!config.SSO_FAILURE_URL) {
+        throw new Error('SSO_FAILURE_URL is required for TOKEN authentication mode');
+      }
+    }
+
     this.#config = {
       // Session Mode
       SESSION_MODE: config.SESSION_MODE || SessionMode.SESSION,
@@ -238,9 +273,16 @@ export class SessionManager {
    * Generate and store JWT token in Redis
    * - JWT payload contains only { email, tid } for minimal size
    * - Full user data is stored in Redis as single source of truth
-   * @param {object} user User object
+   * @param {object} user User object with email and attributes
    * @returns {Promise<string>} Returns the generated JWT token
+   * @throws {Error} If JWT encryption fails
+   * @throws {Error} If Redis storage fails
    * @private
+   * @example
+   * const token = await this.#generateAndStoreToken({
+   *   email: 'user@example.com',
+   *   attributes: { /* user data * / }
+   * });
    */
   async #generateAndStoreToken(user) {
     // Generate unique token ID for this device/session
@@ -266,13 +308,17 @@ export class SessionManager {
   }
 
   /**
-   * Verify token authentication
-   * @param {import('@types/express').Request} req Request
-   * @param {import('@types/express').Response} res Response
-   * @param {import('@types/express').NextFunction} next Next function
-   * @param {boolean} isDebugging Debugging flag
-   * @param {string} redirectUrl Redirect URL
+   * Verify token authentication - extracts and validates JWT from Authorization header
+   * @param {import('@types/express').Request} req Request with Authorization header
+   * @param {import('@types/express').Response} res Response object
+   * @param {import('@types/express').NextFunction} next Next middleware function
+   * @param {boolean} isDebugging If true, allows unauthenticated requests
+   * @param {string} redirectUrl URL to redirect to on authentication failure
+   * @throws {CustomError} If token is missing, invalid, or expired
    * @private
+   * @example
+   * // Authorization header format: "Bearer {jwt_token}"
+   * await this.#verifyToken(req, res, next, false, '/login');
    */
   async #verifyToken(req, res, next, isDebugging, redirectUrl) {
     try {
@@ -306,7 +352,6 @@ export class SessionManager {
 
       // Parse and attach user to request
       req.user = JSON.parse(userData);
-      res.locals.user = req.user;
 
       // Validate authorization
       const { authorized = isDebugging } = req.user ?? { authorized: isDebugging };
@@ -337,12 +382,13 @@ export class SessionManager {
   }
 
   /**
-   * Verify session authentication
-   * @param {import('@types/express').Request} req Request
-   * @param {import('@types/express').Response} res Response
-   * @param {import('@types/express').NextFunction} next Next function
-   * @param {boolean} isDebugging Debugging flag
-   * @param {string} redirectUrl Redirect URL
+   * Verify session authentication - checks if user is authorized in session
+   * @param {import('@types/express').Request} req Request with session data
+   * @param {import('@types/express').Response} res Response object
+   * @param {import('@types/express').NextFunction} next Next middleware function
+   * @param {boolean} isDebugging If true, allows unauthorized users
+   * @param {string} redirectUrl URL to redirect to if user is unauthorized
+   * @throws {CustomError} If user is not authorized
    * @private
    */
   async #verifySession(req, res, next, isDebugging, redirectUrl) {
@@ -357,13 +403,18 @@ export class SessionManager {
   }
 
   /**
-   * Refresh token authentication
-   * @param {import('@types/express').Request} req Request
-   * @param {import('@types/express').Response} res Response
-   * @param {import('@types/express').NextFunction} next Next function
-   * @param {(user: object) => object} initUser Initialize user function
-   * @param {string} idpUrl Identity provider URL
+   * Refresh token authentication - exchanges refresh token for new JWT
+   * Invalidates old token and generates a new one with updated user data
+   * @param {import('@types/express').Request} req Request with Authorization header
+   * @param {import('@types/express').Response} res Response object
+   * @param {import('@types/express').NextFunction} next Next middleware function
+   * @param {(user: object) => object} initUser Function to initialize/transform user object
+   * @param {string} idpUrl Identity provider refresh endpoint URL
+   * @throws {CustomError} If refresh lock is active or SSO refresh fails
    * @private
+   * @example
+   * // Response format:
+   * // { token: "new_jwt", user: {...}, expiresIn: 64800, tokenType: "Bearer" }
    */
   async #refreshToken(req, res, next, initUser, idpUrl) {
     try {

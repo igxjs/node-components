@@ -10,6 +10,10 @@ describe('SessionManager', () => {
 
   beforeEach(() => {
     clock = sinon.useFakeTimers();
+    // Initialize sessionManager with required SESSION_SECRET
+    sessionManager = new SessionManager({
+      SESSION_SECRET: 'test-secret-key-for-testing',
+    });
   });
 
   afterEach(() => {
@@ -23,7 +27,12 @@ describe('SessionManager', () => {
       expect(config).to.have.property('SSO_ENDPOINT_URL');
       expect(config).to.have.property('SESSION_SECRET');
       expect(config).to.have.property('REDIS_URL');
-      sessionManager = new SessionManager(config);
+      
+      // Create SessionManager with required SESSION_SECRET
+      const manager = new SessionManager({
+        SESSION_SECRET: 'test-secret',
+      });
+      expect(manager).to.be.instanceOf(SessionManager);
     });
   });
 

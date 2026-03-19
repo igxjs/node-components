@@ -120,7 +120,7 @@ describe('JwtManager', () => {
     it('should decrypt a valid JWT token', async () => {
       const token = await jwtManager.encrypt(testData, testSecret);
       const result = await jwtManager.decrypt(token, testSecret);
-      
+
       expect(result).to.have.property('payload');
       expect(result).to.have.property('protectedHeader');
       expect(result.payload).to.include(testData);
@@ -129,7 +129,7 @@ describe('JwtManager', () => {
     it('should decrypt token with correct payload data', async () => {
       const token = await jwtManager.encrypt(testData, testSecret);
       const result = await jwtManager.decrypt(token, testSecret);
-      
+
       expect(result.payload.userId).to.equal(testData.userId);
       expect(result.payload.email).to.equal(testData.email);
       expect(result.payload.role).to.equal(testData.role);
@@ -138,14 +138,14 @@ describe('JwtManager', () => {
     it('should include standard JWT claims in decrypted payload', async () => {
       const token = await jwtManager.encrypt(testData, testSecret);
       const result = await jwtManager.decrypt(token, testSecret);
-      
+
       expect(result.payload).to.have.property('iat');
       expect(result.payload).to.have.property('exp');
     });
 
     it('should fail to decrypt with wrong secret', async () => {
       const token = await jwtManager.encrypt(testData, testSecret);
-      
+
       try {
         await jwtManager.decrypt(token, 'wrong-secret');
         expect.fail('Should have thrown an error');
@@ -158,19 +158,19 @@ describe('JwtManager', () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         expirationTime: 1
       });
-      
+
       // Use higher clock tolerance to allow slightly expired tokens
       const result = await jwtManager.decrypt(token, testSecret, {
         clockTolerance: 120
       });
-      
+
       expect(result.payload).to.include(testData);
     });
 
     it('should validate issuer claim when provided (camelCase)', async () => {
       const issuer = 'test-issuer';
       const token = await jwtManager.encrypt(testData, testSecret, { issuer: issuer });
-      
+
       const result = await jwtManager.decrypt(token, testSecret, { issuer: issuer });
       expect(result.payload.iss).to.equal(issuer);
     });
@@ -179,7 +179,7 @@ describe('JwtManager', () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         issuer: 'correct-issuer'
       });
-      
+
       try {
         await jwtManager.decrypt(token, testSecret, {
           issuer: 'wrong-issuer'
@@ -193,7 +193,7 @@ describe('JwtManager', () => {
     it('should validate audience claim when provided (camelCase)', async () => {
       const audience = 'test-audience';
       const token = await jwtManager.encrypt(testData, testSecret, { audience: audience });
-      
+
       const result = await jwtManager.decrypt(token, testSecret, { audience: audience });
       expect(result.payload.aud).to.equal(audience);
     });
@@ -202,7 +202,7 @@ describe('JwtManager', () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         audience: 'correct-audience'
       });
-      
+
       try {
         await jwtManager.decrypt(token, testSecret, {
           audience: 'wrong-audience'
@@ -216,7 +216,7 @@ describe('JwtManager', () => {
     it('should validate subject claim when provided (camelCase)', async () => {
       const subject = 'test-subject';
       const token = await jwtManager.encrypt(testData, testSecret, { subject: subject });
-      
+
       const result = await jwtManager.decrypt(token, testSecret, { subject: subject });
       expect(result.payload.sub).to.equal(subject);
     });
@@ -225,7 +225,7 @@ describe('JwtManager', () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         subject: 'correct-subject'
       });
-      
+
       try {
         await jwtManager.decrypt(token, testSecret, {
           subject: 'wrong-subject'
@@ -242,10 +242,10 @@ describe('JwtManager', () => {
         JWT_AUDIENCE: 'default-audience',
         JWT_SUBJECT: 'default-subject'
       });
-      
+
       const token = await manager.encrypt(testData, testSecret);
       const result = await manager.decrypt(token, testSecret);
-      
+
       expect(result.payload.iss).to.equal('default-issuer');
       expect(result.payload.aud).to.equal('default-audience');
       expect(result.payload.sub).to.equal('default-subject');
@@ -259,10 +259,10 @@ describe('JwtManager', () => {
         name: 'John Doe',
         permissions: ['read', 'write']
       };
-      
+
       const token = await jwtManager.encrypt(originalData, testSecret);
       const result = await jwtManager.decrypt(token, testSecret);
-      
+
       expect(result.payload.id).to.equal(originalData.id);
       expect(result.payload.name).to.equal(originalData.name);
       expect(result.payload.permissions).to.deep.equal(originalData.permissions);
@@ -273,10 +273,10 @@ describe('JwtManager', () => {
         JWT_SECRET_HASH_ALGORITHM: 'SHA-256',
         JWT_ENCRYPTION: 'A256GCM' // SHA-256 produces 256 bits, matches A256GCM
       });
-      
+
       const token = await manager.encrypt(testData, testSecret);
       const result = await manager.decrypt(token, testSecret);
-      
+
       expect(result.payload).to.include(testData);
     });
 
@@ -284,7 +284,7 @@ describe('JwtManager', () => {
       const emptyData = {};
       const token = await jwtManager.encrypt(emptyData, testSecret);
       const result = await jwtManager.decrypt(token, testSecret);
-      
+
       expect(result.payload).to.have.property('iat');
       expect(result.payload).to.have.property('exp');
     });
@@ -298,10 +298,10 @@ describe('JwtManager', () => {
         object: { nested: 'value' },
         null: null
       };
-      
+
       const token = await jwtManager.encrypt(complexData, testSecret);
       const result = await jwtManager.decrypt(token, testSecret);
-      
+
       expect(result.payload.string).to.equal(complexData.string);
       expect(result.payload.number).to.equal(complexData.number);
       expect(result.payload.boolean).to.equal(complexData.boolean);
@@ -333,7 +333,7 @@ describe('JwtManager', () => {
     it('should fail with corrupted token', async () => {
       const token = await jwtManager.encrypt(testData, testSecret);
       const corruptedToken = token.slice(0, -10) + 'corrupted';
-      
+
       try {
         await jwtManager.decrypt(corruptedToken, testSecret);
         expect.fail('Should have thrown an error');

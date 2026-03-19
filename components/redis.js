@@ -11,17 +11,36 @@ export class RedisManager {
   #client = null;
   /**
    * Connect with Redis
+   * @param {string} redisUrl Redis connection URL
+   * @param {string} certPath Path to TLS certificate (required when using rediss:// protocol)
    * @returns {Promise<boolean>} Returns `true` if Redis server is connected
+   * @throws {TypeError} If redisUrl is not a string
+   * @throws {Error} If TLS is enabled but certPath is invalid
    */
   async connect(redisUrl, certPath) {
     if (redisUrl?.length > 0) {
       try {
+        // Validate redisUrl is a string
+        if (typeof redisUrl !== 'string') {
+          throw new TypeError(`Invalid redisUrl: expected string but received ${typeof redisUrl}`);
+        }
+
         /** @type {import('@redis/client').RedisClientOptions} */
         const options = {
           url: redisUrl,
           socket: { tls: redisUrl.includes('rediss:'), ca: null },
         };
-        if(options.socket.tls) {
+
+        if (options.socket.tls) {
+          // Validate certPath when TLS is enabled
+          if (!certPath || typeof certPath !== 'string') {
+            throw new Error('TLS certificate path is required when using rediss:// protocol');
+          }
+
+          if (!fs.existsSync(certPath)) {
+            throw new Error(`TLS certificate file not found at path: ${certPath}`);
+          }
+
           const caCert = fs.readFileSync(certPath);
           options.socket.ca = caCert;
         }

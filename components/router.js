@@ -43,11 +43,23 @@ export class FlexRouter {
   }
 
   /**
-   * Mount router
+   * Mount router to Express application
    * @param {import('@types/express').Express} app Express app
    * @param {string} basePath Base path
+   * @throws {TypeError} If app is not a valid Express instance
+   * @throws {TypeError} If basePath is not a string
    */
   mount(app, basePath) {
+    // Validate app is an Express instance (has 'use' method)
+    if (!app || typeof app.use !== 'function') {
+      throw new TypeError('Invalid Express app: app must be an Express application instance with a "use" method');
+    }
+
+    // Validate basePath is a string
+    if (typeof basePath !== 'string') {
+      throw new TypeError(`Invalid basePath: expected string but received ${typeof basePath}`);
+    }
+
     const path = basePath.concat(this.context);
     app.use(path, this.handlers, this.router);
   }

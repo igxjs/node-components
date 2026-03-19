@@ -1,0 +1,101 @@
+{
+  "projectInfo": {
+    "name": "@igxjs/node-components",
+    "type": "library",
+    "language": "javascript-es6",
+    "framework": "express"
+  },
+  "codingStandards": {
+    "style": "custom-node-components",
+    "moduleSystem": "esm",
+    "namingConventions": {
+      "constructorOptions": "SCREAMING_SNAKE_CASE",
+      "methodParameters": "camelCase",
+      "classes": "PascalCase",
+      "methods": "camelCase",
+      "constants": "SCREAMING_SNAKE_CASE"
+    },
+    "patterns": {
+      "architecture": "component-based",
+      "exports": "named-exports-from-index",
+      "classPattern": "singleton-managers",
+      "asyncPattern": "async-await"
+    },
+    "documentation": {
+      "required": true,
+      "style": "jsdoc",
+      "includeTypes": true,
+      "includeExamples": true
+    }
+  },
+  "fileOrganization": {
+    "components": "components/",
+    "tests": "tests/",
+    "docs": "docs/",
+    "types": "index.d.ts"
+  },
+  "testing": {
+    "framework": "mocha",
+    "assertionLibrary": "chai",
+    "coverage": "recommended",
+    "mockingLibrary": "sinon"
+  },
+  "linting": {
+    "recommended": {
+      "extends": ["eslint:recommended"],
+      "rules": {
+        "no-unused-vars": "warn",
+        "no-console": "off",
+        "prefer-const": "error",
+        "no-var": "error",
+        "arrow-spacing": "error",
+        "comma-dangle": ["error", "only-multiline"]
+      },
+      "parserOptions": {
+        "ecmaVersion": 2022,
+        "sourceType": "module"
+      }
+    }
+  },
+  "memoryBank": {
+    "enabled": true,
+    "location": "docs/rules/memory-bank",
+    "contextFiles": [
+      "docs/rules/memory-bank/activeContext.md",
+      "docs/rules/memory-bank/projectbrief.md",
+      "docs/rules/memory-bank/productContext.md",
+      "docs/rules/memory-bank/systemPatterns.md",
+      "docs/rules/memory-bank/techContext.md",
+      "docs/rules/memory-bank/progress.md"
+    ],
+    "prioritization": {
+      "activeContext": "high",
+      "projectbrief": "high",
+      "productContext": "medium",
+      "systemPatterns": "high",
+      "techContext": "medium",
+      "progress": "medium"
+    },
+    "guidelines": "docs/rules/MEMORY_BANK_GUIDE.md",
+    "refreshTriggers": [
+      "architecture changes",
+      "new component added",
+      "significant refactoring",
+      "user request with **update memory bank**"
+    ],
+    "persistentMemory": true,
+    "maxTokens": 8192
+  },
+  "workflows": {
+    "newComponent": [
+      "Create component in components/",
+      "Add JSDoc documentation",
+      "Export from index.js and index.d.ts",
+      "Create documentation in docs/",
+      "Write tests in tests/",
+      "Update README.md"
+    ],
+    "testing": "npm test",
+    "documentation": "Maintain in docs/ with examples"
+  }
+}

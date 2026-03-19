@@ -1,6 +1,6 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
-import { httpCodes, httpMessages, CustomError } from '../components/http-handlers.js';
+import { httpCodes, CustomError } from '../components/http-handlers.js';
 
 describe('HTTP Handlers', () => {
   describe('httpCodes', () => {

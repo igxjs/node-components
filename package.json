@@ -5,14 +5,31 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "mocha tests/**/*.test.js --timeout 5000"
+    "test": "mocha tests/**/*.test.js --timeout 5000",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prepublishOnly": "npm run lint && npm test"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/igxjs/node-components.git"
   },
   "keywords": [
-    "igxjs"
+    "igxjs",
+    "express",
+    "session-management",
+    "jwt",
+    "jwe",
+    "redis",
+    "authentication",
+    "sso",
+    "oauth",
+    "middleware",
+    "node-components",
+    "session",
+    "token-auth",
+    "bearer-token",
+    "express-middleware"
   ],
   "author": "Michael",
   "license": "Apache-2.0",
@@ -20,6 +37,9 @@
     "url": "https://github.com/igxjs/node-components/issues"
   },
   "homepage": "https://github.com/igxjs/node-components#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@redis/client": "^5.11.0",
     "@types/express": "^5.0.6",
@@ -31,10 +51,17 @@
   },
   "devDependencies": {
     "chai": "^6.2.2",
-    "express": "^5.2.1",
     "mocha": "^12.0.0-beta-10",
     "sinon": "^21.0.3",
     "supertest": "^7.0.0"
+  },
+  "peerDependencies": {
+    "express": "^4.0.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": false
+    }
   },
   "files": [
     "index.js",
