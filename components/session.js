@@ -58,7 +58,7 @@ export class SessionConfig {
   /** @type {string} */
   SSO_FAILURE_URL;
 
-  /** @type {number} Session age in milliseconds */
+  /** @type {number} Session age in seconds (default: 64800 = 18 hours) */
   SESSION_AGE;
   /**
    * @type {string} Session cookie path
@@ -181,8 +181,8 @@ export class SessionManager {
     this.#config = {
       // Session Mode
       SESSION_MODE: config.SESSION_MODE || SessionMode.SESSION,
-      // Session
-      SESSION_AGE: config.SESSION_AGE || 64800000,
+      // Session - SESSION_AGE is now in seconds (default: 64800 = 18 hours)
+      SESSION_AGE: config.SESSION_AGE || 64800,
       SESSION_COOKIE_PATH: config.SESSION_COOKIE_PATH || '/',
       SESSION_SECRET: config.SESSION_SECRET,
       SESSION_PREFIX: config.SESSION_PREFIX || 'ibmid:',
@@ -254,6 +254,15 @@ export class SessionManager {
   }
 
   /**
+   * Get session age in milliseconds (for express-session cookie maxAge)
+   * @returns {number} Returns the session age in milliseconds
+   * @private
+   */
+  #getSessionAgeInMilliseconds() {
+    return Math.round(this.#config.SESSION_AGE * 1000);
+  }
+
+  /**
    * Get Redis key for token storage
    * @param {string} email User email
    * @param {string} tid Token ID
@@ -300,7 +309,8 @@ export class SessionManager {
   async #generateAndStoreToken(user) {
     // Generate unique token ID for this device/session
     const tid = crypto.randomUUID();
-    const ttlSeconds = Math.floor(this.#config.SESSION_AGE / 1000);
+    // SESSION_AGE is already in seconds
+    const ttlSeconds = this.#config.SESSION_AGE;
     // Create JWT token with only email and tid (minimal payload)
     const token = await this.#jwtManager.encrypt(
       { email: user.email, tid },
@@ -489,7 +499,7 @@ export class SessionManager {
       return res.json({
         token: newToken,
         user,
-        expiresIn: Math.floor(this.#config.SESSION_AGE / 1000),
+        expiresIn: this.#config.SESSION_AGE, // Already in seconds
         tokenType: 'Bearer'
       });
     } catch (error) {
@@ -667,7 +677,10 @@ export class SessionManager {
    */
   async setup(app, updateUser) {
     this.#redisManager = new RedisManager();
-    this.#jwtManager = new JwtManager(this.#config);
+    this.#jwtManager = new JwtManager({
+      ...this.#config,
+      JWT_EXPIRATION_TIME: this.#config.SESSION_AGE, // SESSION_AGE is already in seconds
+    });
     // Identity Provider Request
     this.#idpRequest = axios.create({
       baseURL: this.#config.SSO_ENDPOINT_URL,
@@ -686,7 +699,7 @@ export class SessionManager {
     // Redis Session
     this.#logger.log('### Using Redis as the Session Store ###');
     return session({
-      cookie: { maxAge: this.#config.SESSION_AGE, path: this.#config.SESSION_COOKIE_PATH, sameSite: false },
+      cookie: { maxAge: this.#getSessionAgeInMilliseconds(), path: this.#config.SESSION_COOKIE_PATH, sameSite: false },
       store: new RedisStore({ client: this.#redisManager.getClient(), prefix: this.#config.SESSION_PREFIX, disableTouch: true }),
       resave: false, saveUninitialized: false,
       secret: this.#config.SESSION_SECRET,
@@ -702,7 +715,7 @@ export class SessionManager {
     this.#logger.log('### Using Memory as the Session Store ###');
     const MemoryStore = memStore(session);
     return session({
-      cookie: { maxAge: this.#config.SESSION_AGE, path: this.#config.SESSION_COOKIE_PATH, sameSite: false },
+      cookie: { maxAge: this.#getSessionAgeInMilliseconds(), path: this.#config.SESSION_COOKIE_PATH, sameSite: false },
       store: new MemoryStore({}),
       resave: false, saveUninitialized: false,
       secret: this.#config.SESSION_SECRET,

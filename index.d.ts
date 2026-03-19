@@ -122,9 +122,9 @@ export interface SessionConfig {
   SESSION_MODE?: string;
 
   /** 
-   * Session expiration time in milliseconds
-   * @example 3600000 (1 hour) or 86400000 (24 hours)
-   * @default 3600000 (1 hour)
+   * Session expiration time in seconds
+   * @example 3600 (1 hour) or 86400 (24 hours) or 64800 (18 hours)
+   * @default 64800 (18 hours)
    */
   SESSION_AGE?: number;
 

@@ -78,7 +78,7 @@ flexRouter.mount(app, '');
 import { JwtManager } from '@igxjs/node-components';
 
 // Constructor uses UPPERCASE naming with JWT_ prefix
-const jwt = new JwtManager({ SESSION_AGE: 64800000 });
+const jwt = new JwtManager({ JWT_EXPIRATION_TIME: 64800 });
 const SECRET = process.env.JWT_SECRET;
 
 // Create token (encrypt method uses camelCase for per-call options)
@@ -127,7 +127,7 @@ Uses traditional server-side session cookies. When a user authenticates via SSO,
 
 **Configuration:**
 - `SESSION_MODE`: `SessionMode.SESSION` (default) - Uses session-based authentication
-- `SESSION_AGE`: Session timeout in milliseconds (default: 64800000)
+- `SESSION_AGE`: Session timeout in seconds (default: 64800 = 18 hours)
 - `REDIS_URL`: Redis connection string for session storage
 
 **Auth Methods:**
@@ -182,7 +182,7 @@ fetch('/api/protected', {
 | `SSO_SUCCESS_URL` | string | - | Redirect URL after successful login (token mode) |
 | `SSO_FAILURE_URL` | string | - | Redirect URL after failed login (token mode) |
 | `SESSION_MODE` | string | `SessionMode.SESSION` | Authentication mode: `SessionMode.SESSION` or `SessionMode.TOKEN` |
-| `SESSION_AGE` | number | 64800000 | Session timeout in milliseconds |
+| `SESSION_AGE` | number | 64800 | Session timeout in seconds (default: 64800 = 18 hours) |
 | `SESSION_COOKIE_PATH` | string | `'/'` | Session cookie path |
 | `SESSION_SECRET` | string | - | Session/JWT secret key |
 | `SESSION_PREFIX` | string | `'ibmid:'` | Redis session/key prefix |

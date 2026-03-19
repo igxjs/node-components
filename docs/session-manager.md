@@ -41,7 +41,7 @@ const config = {
   SSO_FAILURE_URL: '/login',          // Required for TOKEN mode
 
   // Session Configuration
-  SESSION_AGE: 64800000,               // 18 hours in milliseconds
+  SESSION_AGE: 64800,                  // 18 hours in seconds
   SESSION_COOKIE_PATH: '/',
   SESSION_SECRET: 'your-session-secret',
   SESSION_KEY: 'session_token',        // Key name used to store user data (default)
@@ -73,7 +73,7 @@ const config = {
 | `SSO_SUCCESS_URL` | string | TOKEN only | - | Redirect URL after successful login |
 | `SSO_FAILURE_URL` | string | TOKEN only | - | Redirect URL after failed login |
 | `SESSION_MODE` | string | No | `SessionMode.SESSION` | Session mode: `SessionMode.SESSION` or `SessionMode.TOKEN` |
-| `SESSION_AGE` | number | No | 64800000 | Session/token timeout in milliseconds |
+| `SESSION_AGE` | number | No | 64800 | Session/token timeout in seconds (default: 64800 = 18 hours) |
 | `SESSION_COOKIE_PATH` | string | No | `'/'` | Session cookie path (SESSION mode) |
 | `SESSION_SECRET` | string | Yes | - | **JWT secret key used for encrypting/decrypting JWT tokens** |
 | `SESSION_KEY` | string | No | `'session_token'` | **Key name used to store user data** |
@@ -208,7 +208,7 @@ export const session = new SessionManager({
   SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
   SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
   SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET,
-  SESSION_AGE: 64800000,
+  SESSION_AGE: 64800,  // 18 hours in seconds
   SESSION_SECRET: process.env.SESSION_SECRET,  // JWT encryption key
   REDIS_URL: process.env.REDIS_URL
 });
@@ -268,7 +268,7 @@ export const session = new SessionManager({
   SSO_SUCCESS_URL: '/dashboard',
   SSO_FAILURE_URL: '/login',
   SESSION_MODE: SessionMode.TOKEN,  // Enable token-based authentication
-  SESSION_AGE: 64800000,
+  SESSION_AGE: 64800,  // 18 hours in seconds
   SESSION_SECRET: process.env.SESSION_SECRET,  // JWT encryption key
   SESSION_KEY: 'session_token',      // LocalStorage key name for JWT token (default)
   SESSION_EXPIRY_KEY: 'session_expires_at',  // LocalStorage key name for expiry timestamp (default)
