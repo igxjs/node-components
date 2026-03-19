@@ -79,33 +79,160 @@ export const SessionMode: {
 
 // Session Configuration - uses strict UPPERCASE naming convention for all property names
 export interface SessionConfig {
-  /** Identity Provider */
+  /** 
+   * SSO Identity Provider endpoint URL
+   * @example 'https://idp.example.com/open/api/v1'
+   * @required Required when using SSO authentication
+   */
   SSO_ENDPOINT_URL?: string;
+
+  /** 
+   * OAuth2 Client ID registered with the Identity Provider
+   * @example 'my-app-client-id'
+   * @required Required when using SSO authentication
+   */
   SSO_CLIENT_ID?: string;
+
+  /** 
+   * OAuth2 Client Secret for authentication
+   * @example 'super-secret-client-key'
+   * @required Required when using SSO authentication
+   */
   SSO_CLIENT_SECRET?: string;
+
+  /** 
+   * Redirect URL after successful SSO login
+   * @example '/dashboard' or 'https://myapp.com/home'
+   * @default '/'
+   */
   SSO_SUCCESS_URL?: string;
+
+  /** 
+   * Redirect URL after failed SSO login
+   * @example '/login?error=auth_failed'
+   * @default '/login'
+   */
   SSO_FAILURE_URL?: string;
 
-  /** Authentication mode: 'session' or 'token' (default: 'session') */
+  /** 
+   * Authentication mode: 'session' for cookie-based sessions, 'token' for JWT token-based auth
+   * @example 'session' | 'token'
+   * @default 'session'
+   */
   SESSION_MODE?: string;
 
+  /** 
+   * Session expiration time in milliseconds
+   * @example 3600000 (1 hour) or 86400000 (24 hours)
+   * @default 3600000 (1 hour)
+   */
   SESSION_AGE?: number;
+
+  /** 
+   * Cookie path for session cookies
+   * @example '/' for entire site or '/app' for specific path
+   * @default '/'
+   */
   SESSION_COOKIE_PATH?: string;
+
+  /** 
+   * Secret key used for signing session cookies (should be a strong random string)
+   * @example 'your-super-secret-session-key-change-this-in-production'
+   * @required Required for session-based authentication
+   */
   SESSION_SECRET?: string;
+
+  /** 
+   * Redis key prefix for storing session data
+   * @example 'myapp:session:' (will result in keys like 'myapp:session:user@example.com')
+   * @default 'sess:'
+   */
   SESSION_PREFIX?: string;
+
+  /** 
+   * Redis key name for storing session data
+   * @example 'user' (results in session.user containing user data)
+   * @default 'user'
+   */
   SESSION_KEY?: string;
+
+  /** 
+   * Redis key name for storing session expiry timestamp
+   * @example 'expires' (results in session.expires containing expiry time)
+   * @default 'expires'
+   */
   SESSION_EXPIRY_KEY?: string;
+
+  /** 
+   * Path to custom HTML template for token storage page (TOKEN mode only)
+   * @example './templates/token-storage.html'
+   * @default Built-in template included in the library
+   */
   TOKEN_STORAGE_TEMPLATE_PATH?: string;
 
+  /** 
+   * Redis connection URL
+   * @example 'redis://localhost:6379' or 'rediss://user:pass@host:6380/0' (rediss for TLS)
+   * @required Required when using Redis for session storage
+   */
   REDIS_URL?: string;
+
+  /** 
+   * Path to TLS certificate file for secure Redis connections
+   * @example '/path/to/redis-ca-cert.pem'
+   * @optional Only needed for TLS-enabled Redis connections
+   */
   REDIS_CERT_PATH?: string;
 
+  /** 
+   * JWE algorithm for token encryption
+   * @example 'dir' (Direct Key Agreement) or 'RSA-OAEP' or 'A256KW'
+   * @default 'dir'
+   * @see https://tools.ietf.org/html/rfc7518#section-4.1
+   */
   JWT_ALGORITHM?: string;
+
+  /** 
+   * JWE encryption method
+   * @example 'A256GCM' (AES-256 GCM) or 'A128GCM' or 'A192GCM'
+   * @default 'A256GCM'
+   * @see https://tools.ietf.org/html/rfc7518#section-5.1
+   */
   JWT_ENCRYPTION?: string;
+
+  /** 
+   * Clock tolerance in seconds for JWT token validation (allows for time drift between servers)
+   * @example 30 (allows 30 seconds of clock skew)
+   * @default 30
+   */
   JWT_CLOCK_TOLERANCE?: number;
+
+  /** 
+   * Hash algorithm for deriving encryption key from secret
+   * @example 'SHA-256' or 'SHA-384' or 'SHA-512'
+   * @default 'SHA-256'
+   */
   JWT_SECRET_HASH_ALGORITHM?: string;
+
+  /** 
+   * JWT issuer claim (iss) - identifies the principal that issued the token
+   * @example 'https://myapp.com' or 'my-auth-service'
+   * @optional Adds additional security validation
+   */
   JWT_ISSUER?: string;
+
+  /** 
+   * JWT audience claim (aud) - identifies the recipients that the token is intended for
+   * @example 'https://api.myapp.com' or 'my-api-service'
+   * @optional Adds additional security validation
+   */
   JWT_AUDIENCE?: string;
+
+  /** 
+   * JWT subject claim (sub) - identifies the principal that is the subject of the token
+   * @example 'user-authentication' or 'api-access'
+   * @optional Adds additional context to tokens
+   */
   JWT_SUBJECT?: string;
 }
 
@@ -144,8 +271,19 @@ export interface SessionUser {
 // Session Manager
 export class SessionManager {
   /**
-   * Constructor
-   * @param config - Session configuration (uses strict UPPERCASE property names)
+   * Create a new SessionManager instance
+   * @param config Session configuration object with UPPERCASE property names
+   * @example
+   * ```javascript
+   * const sessionManager = new SessionManager({
+   *   SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1',
+   *   SSO_CLIENT_ID: 'my-app-client-id',
+   *   SSO_CLIENT_SECRET: 'secret-key',
+   *   SESSION_MODE: 'session', // or 'token' for JWT-based auth
+   *   SESSION_SECRET: 'your-session-secret',
+   *   REDIS_URL: 'redis://localhost:6379'
+   * });
+   * ```
    */
   constructor(config: SessionConfig);
 
@@ -312,71 +450,187 @@ export class RedisManager {
 
 // JWT Manager Configuration - uses strict UPPERCASE naming convention with JWT_ prefix for all property names
 export interface JwtManagerOptions {
-  /** JWE algorithm (default: 'dir') */
+  /** 
+   * JWE algorithm for token encryption
+   * @example 'dir' (Direct Key Agreement - symmetric encryption, recommended for most cases)
+   * @example 'RSA-OAEP' (RSA with OAEP padding - for asymmetric encryption)
+   * @example 'A256KW' (AES Key Wrap with 256-bit key)
+   * @default 'dir'
+   * @see https://tools.ietf.org/html/rfc7518#section-4.1
+   */
   JWT_ALGORITHM?: string;
 
-  /** JWE encryption method (default: 'A256GCM') */
+  /** 
+   * JWE content encryption method
+   * @example 'A256GCM' (AES-256 GCM - recommended, highest security)
+   * @example 'A128GCM' (AES-128 GCM - faster, lower security)
+   * @example 'A192GCM' (AES-192 GCM - balanced)
+   * @default 'A256GCM'
+   * @see https://tools.ietf.org/html/rfc7518#section-5.1
+   */
   JWT_ENCRYPTION?: string;
 
-  /** Clock tolerance in seconds for token validation (default: 30) */
+  /** 
+   * Token expiration time - accepts number (seconds) or string with time suffix
+   * @example 64800 (18 hours as number)
+   * @example '18h' (18 hours)
+   * @example '7d' (7 days)
+   * @example '1080m' (1080 minutes = 18 hours)
+   * @example '30s' (30 seconds)
+   * @default 64800 (18 hours)
+   */
+  JWT_EXPIRATION_TIME?: number | string;
+
+  /** 
+   * Clock tolerance in seconds for token validation
+   * Allows for small time differences between client and server clocks
+   * @example 30 (allows 30 seconds of clock drift)
+   * @example 60 (more lenient, allows 1 minute of drift)
+   * @default 30
+   */
   JWT_CLOCK_TOLERANCE?: number;
 
-  /** Hash algorithm for secret derivation (default: 'SHA-256') */
+  /** 
+   * Hash algorithm used for deriving encryption key from secret string
+   * @example 'SHA-256' (recommended for most cases)
+   * @example 'SHA-384' (higher security)
+   * @example 'SHA-512' (highest security, slower)
+   * @default 'SHA-256'
+   */
   JWT_SECRET_HASH_ALGORITHM?: string;
 
-  /** Optional JWT issuer claim */
+  /** 
+   * JWT issuer claim (iss) - identifies who issued the token
+   * Used for token validation to ensure tokens are from expected source
+   * @example 'https://myapp.com'
+   * @example 'my-auth-service'
+   * @optional Recommended for production environments
+   */
   JWT_ISSUER?: string;
 
-  /** Optional JWT audience claim */
+  /** 
+   * JWT audience claim (aud) - identifies the intended recipients
+   * Used for token validation to ensure tokens are for the correct service
+   * @example 'https://api.myapp.com'
+   * @example ['api.myapp.com', 'admin.myapp.com'] (can be array)
+   * @optional Recommended for production environments
+   */
   JWT_AUDIENCE?: string;
 
-  /** Optional JWT subject claim */
+  /** 
+   * JWT subject claim (sub) - identifies the principal (subject) of the token
+   * Provides context about what the token represents
+   * @example 'user-authentication'
+   * @example 'api-access-token'
+   * @optional Adds semantic meaning to tokens
+   */
   JWT_SUBJECT?: string;
 }
 
 /**
  * Options for encrypt() method - uses camelCase naming convention
+ * These options allow you to override the defaults set in JwtManagerOptions for specific encryption operations
  */
 export interface JwtEncryptOptions {
-  /** Override default algorithm */
+  /** 
+   * Override default JWE algorithm for this specific token
+   * @example 'dir' or 'RSA-OAEP'
+   * @use-case Use when you need different encryption algorithms for different token types
+   */
   algorithm?: string;
 
-  /** Override default encryption method */
+  /** 
+   * Override default encryption method for this specific token
+   * @example 'A256GCM' or 'A128GCM'
+   * @use-case Use when you need different encryption strength for different token types
+   */
   encryption?: string;
 
-  /** Override default expiration time */
-  expirationTime?: number;
+  /** 
+   * Override default expiration time for this specific token
+   * @example '1h' (short-lived token for sensitive operations)
+   * @example '30m' (half hour)
+   * @example '7d' (long-lived token for remember-me functionality)
+   * @example 3600 (1 hour as number in seconds)
+   * @use-case Use when different tokens need different lifetimes (e.g., access token vs refresh token)
+   */
+  expirationTime?: number | string;
 
-  /** Override default hash algorithm */
+  /** 
+   * Override default hash algorithm for deriving encryption key
+   * @example 'SHA-256' or 'SHA-512'
+   * @use-case Use when you need stronger hashing for specific high-security tokens
+   */
   secretHashAlgorithm?: string;
 
-  /** Override default issuer claim */
+  /** 
+   * Override default issuer claim for this specific token
+   * @example 'https://admin.myapp.com' (for admin tokens)
+   * @use-case Use when tokens are issued by different services
+   */
   issuer?: string;
 
-  /** Override default audience claim */
+  /** 
+   * Override default audience claim for this specific token
+   * @example 'https://api.myapp.com' (for API access tokens)
+   * @example ['service1.myapp.com', 'service2.myapp.com'] (multiple audiences)
+   * @use-case Use when tokens are intended for different services
+   */
   audience?: string;
 
-  /** Override default subject claim */
+  /** 
+   * Override default subject claim for this specific token
+   * @example 'password-reset' (for password reset tokens)
+   * @example 'email-verification' (for verification tokens)
+   * @use-case Use when different token types serve different purposes
+   */
   subject?: string;
 }
 
 /**
  * Options for decrypt() method - uses camelCase naming convention
+ * These options allow you to override validation settings and verify specific claims during decryption
  */
 export interface JwtDecryptOptions {
-  /** Override default clock tolerance */
+  /** 
+   * Override default clock tolerance for this specific token validation
+   * @example 30 (seconds) - allows 30 seconds of clock drift
+   * @example 60 (seconds) - more lenient for distributed systems
+   * @use-case Use when validating tokens from systems with known clock drift issues
+   */
   clockTolerance?: number;
 
-  /** Override default hash algorithm */
+  /** 
+   * Override default hash algorithm for deriving decryption key
+   * Must match the algorithm used during encryption
+   * @example 'SHA-256' or 'SHA-512'
+   * @use-case Use when tokens were encrypted with different hash algorithms
+   */
   secretHashAlgorithm?: string;
 
-  /** Expected issuer claim for validation */
+  /** 
+   * Expected issuer claim (iss) for validation
+   * Token will be rejected if issuer doesn't match
+   * @example 'https://myapp.com'
+   * @use-case Use to ensure tokens come from a specific trusted source
+   */
   issuer?: string;
 
-  /** Expected audience claim for validation */
+  /** 
+   * Expected audience claim (aud) for validation
+   * Token will be rejected if audience doesn't match
+   * @example 'https://api.myapp.com'
+   * @example ['service1.myapp.com', 'service2.myapp.com'] (multiple valid audiences)
+   * @use-case Use to ensure tokens are intended for your service
+   */
   audience?: string;
 
-  /** Expected subject claim for validation */
+  /** 
+   * Expected subject claim (sub) for validation
+   * Token will be rejected if subject doesn't match
+   * @example 'user-authentication'
+   * @use-case Use to validate tokens are of the expected type/purpose
+   */
   subject?: string;
 }
 
@@ -396,6 +650,16 @@ export class JwtManager {
   /**
    * Create a new JwtManager instance with configurable defaults
    * @param options Configuration options (uses strict UPPERCASE with JWT_ prefix property names)
+   * @example
+   * ```javascript
+   * const jwtManager = new JwtManager({
+   *   JWT_ALGORITHM: 'dir',
+   *   JWT_ENCRYPTION: 'A256GCM',
+   *   JWT_EXPIRATION_TIME: '18h', // or 64800 seconds
+   *   JWT_ISSUER: 'https://myapp.com',
+   *   JWT_AUDIENCE: 'https://api.myapp.com'
+   * });
+   * ```
    */
   constructor(options?: JwtManagerOptions);
 
@@ -409,11 +673,25 @@ export class JwtManager {
   encrypt(data: JWTPayload, input: string, options?: JwtEncryptOptions): Promise<string>;
 
   /**
-   * Decrypt JWT token for user session
-   * @param token JWT token to decrypt
-   * @param input Secret key or password for decryption
-   * @param options Per-call configuration overrides (uses strict UPPERCASE with JWT_ prefix property names)
-   * @returns Returns decrypted JWT token
+   * Decrypt and validate JWT token for user session
+   * @param token JWT token string to decrypt and validate
+   * @param input Secret key or password for decryption (must match the key used for encryption)
+   * @param options Per-call validation overrides (uses camelCase property names)
+   * @returns Returns decrypted JWT token result containing payload and protected header
+   * @throws Will throw error if token is invalid, expired, or validation fails
+   * @example
+   * ```javascript
+   * try {
+   *   const result = await jwtManager.decrypt(
+   *     tokenString,
+   *     'my-secret-key',
+   *     { issuer: 'https://myapp.com' } // Optional: validate issuer claim
+   *   );
+   *   console.log(result.payload); // Access decrypted data
+   * } catch (error) {
+   *   console.error('Token validation failed:', error.message);
+   * }
+   * ```
    */
   decrypt(token: string, input: string, options?: JwtDecryptOptions): Promise<JwtDecryptResult>;
 }

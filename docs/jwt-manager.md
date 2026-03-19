@@ -21,7 +21,8 @@ Constructor options use `JWT_` prefix with UPPERCASE naming convention:
 const jwtOptions = {
   JWT_ALGORITHM: 'dir',              // JWE algorithm (default: 'dir')
   JWT_ENCRYPTION: 'A256GCM',         // JWE encryption method (default: 'A256GCM')
-  SESSION_AGE: 64800000,             // Token expiration time in milliseconds (default: 64800000 = 18 hours)
+  JWT_EXPIRATION_TIME: 64800,        // Token expiration time - number in seconds (e.g., 64800 = 18 hours)
+                                     // OR string with time suffix (e.g., '18h', '7d', '1080m')
   JWT_CLOCK_TOLERANCE: 30,           // Clock tolerance in seconds (default: 30)
   JWT_SECRET_HASH_ALGORITHM: 'SHA-256', // Hash algorithm for secret derivation (default: 'SHA-256')
   JWT_ISSUER: 'your-app',            // Optional JWT issuer claim
@@ -30,7 +31,9 @@ const jwtOptions = {
 };
 ```
 
-**Note:** `SESSION_AGE` is specified in **milliseconds** (consistent with session management), but internally converted to seconds for JWT expiration as required by the jose library.
+**Note:** `JWT_EXPIRATION_TIME` accepts:
+- **Number**: Seconds (e.g., `64800` = 18 hours) - numbers are automatically converted to the format required by jose
+- **String**: Time with suffix (e.g., `'18h'`, `'7d'`, `'1080m'`, `'30s'`) - passed directly to jose library
 
 ### encrypt() Method Options
 
@@ -40,16 +43,22 @@ Per-call encryption options use camelCase naming convention:
 const encryptOptions = {
   algorithm: 'dir',              // JWE algorithm (overrides constructor default)
   encryption: 'A256GCM',         // JWE encryption method
-  expirationTime: 3600,          // Token expiration time in seconds (overrides instance default)
+  expirationTime: 3600,          // Token expiration time - number (seconds) or string (e.g., '1h', '30m')
   secretHashAlgorithm: 'SHA-256' // Hash algorithm for secret derivation
 };
 
 // Add optional JWT claims
 encryptOptions.issuer = 'my-app';
 encryptOptions.audience = 'my-users';
+
+// Examples of different expirationTime formats:
+// expirationTime: 3600      // Number: 3600 seconds (1 hour)
+// expirationTime: '1h'      // String: 1 hour
+// expirationTime: '30m'     // String: 30 minutes
+// expirationTime: '7d'      // String: 7 days
 ```
 
-**Note:** The `expirationTime` in the encrypt method options is specified in **seconds** (as required by jose library), while `SESSION_AGE` in constructor options is in milliseconds.
+**Note:** The `expirationTime` accepts both numbers (in seconds) and strings (with time suffix like '1h', '30m', '7d'), giving you flexibility in how you specify expiration times.
 
 ### decrypt() Method Options
 
@@ -70,8 +79,10 @@ const decryptOptions = {
 import { JwtManager } from '@igxjs/node-components';
 
 // Create instance with default configuration using constructor options (JWT_ prefix)
+// You can use either number (seconds) or string (with time suffix)
 const jwtManager = new JwtManager({
-  SESSION_AGE: 3600000,
+  JWT_EXPIRATION_TIME: 3600,     // Number: 3600 seconds = 1 hour
+  // OR: JWT_EXPIRATION_TIME: '1h',  // String: 1 hour
   JWT_ISSUER: 'my-app',
   JWT_AUDIENCE: 'my-users'
 });
@@ -91,9 +102,20 @@ const token = await jwtManager.encrypt(userData, secret);
 console.log('Encrypted Token:', token);
 
 // Encrypt with custom per-call options (camelCase)
+// You can use number or string format
 const shortExpiryToken = await jwtManager.encrypt(userData, secret, {
-  expirationTime: 3600,         // Override default expiration time
+  expirationTime: 3600,         // Number: 3600 seconds = 1 hour
+  // OR: expirationTime: '1h',  // String: 1 hour
   issuer: 'temporary-issuer'    // Temporary issuer for this token
+});
+
+// More examples with string formats
+const dailyToken = await jwtManager.encrypt(userData, secret, {
+  expirationTime: '24h'         // Expires in 24 hours
+});
+
+const weeklyToken = await jwtManager.encrypt(userData, secret, {
+  expirationTime: '7d'          // Expires in 7 days
 });
 
 // Decrypt token - decrypt method uses camelCase for per-call options

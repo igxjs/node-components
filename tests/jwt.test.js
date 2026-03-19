@@ -21,7 +21,7 @@ describe('JwtManager', () => {
       expect(manager).to.be.instanceOf(JwtManager);
       expect(manager.algorithm).to.equal('dir');
       expect(manager.encryption).to.equal('A256GCM');
-      expect(manager.expirationTime).to.equal(64800); // 64800000ms / 1000 = 64800 seconds
+      expect(manager.expirationTime).to.equal(64800); // 64800 seconds = 18 hours
       expect(manager.clockTolerance).to.equal(30);
       expect(manager.secretHashAlgorithm).to.equal('SHA-256');
     });
@@ -30,7 +30,7 @@ describe('JwtManager', () => {
       const options = {
         JWT_ALGORITHM: 'A128KW',
         JWT_ENCRYPTION: 'A128GCM',
-        SESSION_AGE: 3600000, // 1 hour in milliseconds
+        JWT_EXPIRATION_TIME: 3600, // 1 hour in seconds
         JWT_CLOCK_TOLERANCE: 60,
         JWT_SECRET_HASH_ALGORITHM: 'SHA-512',
         JWT_ISSUER: 'test-issuer',
@@ -40,12 +40,19 @@ describe('JwtManager', () => {
       const manager = new JwtManager(options);
       expect(manager.algorithm).to.equal('A128KW');
       expect(manager.encryption).to.equal('A128GCM');
-      expect(manager.expirationTime).to.equal(3600); // 3600000ms / 1000 = 3600 seconds
+      expect(manager.expirationTime).to.equal(3600); // 3600 seconds = 1 hour
       expect(manager.clockTolerance).to.equal(60);
       expect(manager.secretHashAlgorithm).to.equal('SHA-512');
       expect(manager.issuer).to.equal('test-issuer');
       expect(manager.audience).to.equal('test-audience');
       expect(manager.subject).to.equal('test-subject');
+    });
+
+    it('should create JwtManager instance with string expiration time', () => {
+      const manager = new JwtManager({
+        JWT_EXPIRATION_TIME: '18h'
+      });
+      expect(manager.expirationTime).to.equal('18h');
     });
 
     it('should handle clockTolerance of 0', () => {
@@ -69,11 +76,28 @@ describe('JwtManager', () => {
       expect(token).to.be.a('string');
     });
 
-    it('should encrypt with custom expiration time (camelCase)', async () => {
+    it('should encrypt with custom expiration time as number (camelCase)', async () => {
       const token = await jwtManager.encrypt(testData, testSecret, {
         expirationTime: 3600
       });
       expect(token).to.be.a('string');
+    });
+
+    it('should encrypt with custom expiration time as string (camelCase)', async () => {
+      const token = await jwtManager.encrypt(testData, testSecret, {
+        expirationTime: '1h'
+      });
+      expect(token).to.be.a('string');
+    });
+
+    it('should encrypt with string time formats', async () => {
+      const formats = ['30s', '10m', '1h', '7d'];
+      for (const format of formats) {
+        const token = await jwtManager.encrypt(testData, testSecret, {
+          expirationTime: format
+        });
+        expect(token).to.be.a('string');
+      }
     });
 
     it('should encrypt with issuer claim (camelCase)', async () => {
@@ -253,6 +277,17 @@ describe('JwtManager', () => {
   });
 
   describe('encrypt/decrypt round-trip', () => {
+    it('should successfully encrypt and decrypt with string expiration format', async () => {
+      const token = await jwtManager.encrypt(testData, testSecret, {
+        expirationTime: '1h'
+      });
+      const result = await jwtManager.decrypt(token, testSecret);
+
+      expect(result.payload.userId).to.equal(testData.userId);
+      expect(result.payload.email).to.equal(testData.email);
+      expect(result.payload.role).to.equal(testData.role);
+    });
+
     it('should successfully encrypt and decrypt data', async () => {
       const originalData = {
         id: 'user-123',
