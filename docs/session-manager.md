@@ -67,7 +67,7 @@ const config = {
 
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|---------|
-| `SSO_ENDPOINT_URL` | string | Yes | - | Identity provider endpoint URL |
+| `SSO_ENDPOINT_URL` | string | Yes | - | **Identity Provider microservice endpoint URL** - Base URL for your customized SSO authentication service. See [Identity Provider Microservice](#identity-provider-microservice) section for API details. Example: `https://idp.example.com/open/api/v1` |
 | `SSO_CLIENT_ID` | string | Yes | - | SSO client ID |
 | `SSO_CLIENT_SECRET` | string | Yes | - | SSO client secret |
 | `SSO_SUCCESS_URL` | string | TOKEN only | - | Redirect URL after successful login |
@@ -95,6 +95,77 @@ const config = {
 | `JWT_ISSUER` | string | No | - | JWT issuer identifier |
 | `JWT_AUDIENCE` | string | No | - | JWT audience identifier |
 | `JWT_SUBJECT` | string | No | - | JWT subject identifier |
+
+## Identity Provider Microservice
+
+### Overview
+
+The `SSO_ENDPOINT_URL` configuration points to a fully customized, independent Identity Provider (IdP) microservice that handles SSO authentication for your applications. This microservice is separate from your main application and serves as a centralized authentication service that can be shared across multiple applications.
+
+### Endpoint URL Format
+
+The endpoint URL should point to the base URL of your Identity Provider service:
+
+```
+https://idp.example.com/open/api/v1
+```
+
+### Identity Provider APIs
+
+The Identity Provider microservice exposes the following REST APIs that SessionManager uses internally:
+
+#### `GET /auth/providers`
+
+Retrieves a list of supported identity providers (e.g., Google, Azure AD, SAML, etc.).
+
+**Response includes:**
+- `id` - Unique identifier for the identity provider
+- `priority` - Display order in the provider list
+- `name` - Human-readable name of the provider
+- `url` - Login API URL for this provider
+- `attributes` - UI display information
+  - `icon` - URL to provider icon for login button
+  - `kind` - Theme identifier (e.g., `primary`, `secondary`)
+
+**Used by:** `identityProviders()` method
+
+#### `POST /auth/login/:idp`
+
+Generates a login URL with necessary parameters for the specified identity provider. This API constructs the complete URL that redirects users to the actual identity provider's login page.
+
+**Parameters:**
+- `:idp` - Identity provider ID from the providers list
+
+**Used by:** Client applications to initiate SSO login flow
+
+#### `POST /auth/verify`
+
+Verifies the validity of a JWT token issued by the Identity Provider.
+
+**Purpose:** Token validation and integrity checking
+
+#### `GET /auth/callback/:idp`
+
+Handles the callback from the identity provider after user authentication. Validates the authentication result and returns user data to the application.
+
+**Parameters:**
+- `:idp` - Identity provider ID
+
+**Returns:** JWT token containing user information and session data
+
+**Used by:** `callback()` method
+
+#### `POST /auth/refresh`
+
+Refreshes an expired or expiring access token without requiring the user to re-authenticate.
+
+**Purpose:** Extends user sessions seamlessly
+
+**Used by:** `refresh()` method
+
+### Integration with SessionManager
+
+SessionManager automatically configures an Axios instance using your `SSO_ENDPOINT_URL` and makes internal calls to these APIs during the authentication lifecycle. You don't need to call these APIs directly - SessionManager handles all communication with the Identity Provider microservice.
 
 ## ⚠️ Important: Singleton Pattern
 

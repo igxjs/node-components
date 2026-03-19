@@ -34,7 +34,20 @@ export class SessionConfig {
    * @default SessionMode.SESSION
    */
   SESSION_MODE;
-  /** @type {string} */
+  /** 
+   * @type {string} Identity Provider microservice endpoint URL
+   * 
+   * This is a fully customized, independent microservice that provides SSO authentication.
+   * The endpoint serves multiple applications and provides the following APIs:
+   * - GET /auth/providers - List supported identity providers
+   * - POST /auth/login/:idp - Generate login URL for specific identity provider
+   * - POST /auth/verify - Verify JWT token validity
+   * - GET /auth/callback/:idp - Validate authentication and return user data
+   * - POST /auth/refresh - Refresh access tokens
+   * 
+   * @example
+   * SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1'
+   */
   SSO_ENDPOINT_URL;
   /** @type {string} */
   SSO_CLIENT_ID;
