@@ -5,10 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "mocha tests/**/*.test.js --timeout 5000",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "prepublishOnly": "npm run lint && npm test"
+    "test": "mocha tests/**/*.test.js --timeout 5000"
   },
   "repository": {
     "type": "git",

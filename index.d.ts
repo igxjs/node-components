@@ -634,7 +634,7 @@ export interface JwtDecryptOptions {
   subject?: string;
 }
 
-export type JwtDecryptResult = JWTDecryptResult<EncryptJWT>;
+export type JwtDecryptResult = JWTDecryptResult;
 
 // JwtManager class for JWT encryption and decryption
 export class JwtManager {
@@ -667,7 +667,7 @@ export class JwtManager {
    * Generate JWT token for user session
    * @param data User data payload
    * @param input Secret key or password for encryption
-   * @param options Per-call configuration overrides (uses strict UPPERCASE with JWT_ prefix property names)
+   * @param options Per-call configuration overrides (uses camelCase property names)
    * @returns Returns encrypted JWT token
    */
   encrypt(data: JWTPayload, input: string, options?: JwtEncryptOptions): Promise<string>;

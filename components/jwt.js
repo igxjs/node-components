@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+import { webcrypto as crypto } from 'node:crypto';
 
 import { jwtDecrypt, EncryptJWT } from 'jose';
 
@@ -127,7 +127,7 @@ export class JwtManager {
    * @param {string} token JWT token to decrypt
    * @param {string} secret Secret key or password for decryption
    * @param {JwtDecryptOptions} [options] Per-call configuration overrides (camelCase naming convention)
-   * @returns {Promise<import('jose').JWTDecryptResult<import('jose').EncryptJWT>} Returns decrypted JWT token
+   * @returns {Promise<import('jose').JWTDecryptResult>} Returns decrypted JWT token
    */
   async decrypt(token, secret, options = {}) {
     const clockTolerance = options.clockTolerance ?? this.clockTolerance;
