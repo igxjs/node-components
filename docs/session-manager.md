@@ -446,9 +446,27 @@ app.get('/api/profile',
   - Note: User transformation is done in `callback()` and `refresh()` methods, not in `setup()`
 
 - **`authenticate(errorRedirectUrl?)`** - Protect routes based on configured SESSION_MODE
-  - Uses `verifySession()` for SESSION mode
-  - Uses `verifyToken()` for TOKEN mode
+  - SESSION mode: Verifies user exists in session store and is authorized (checks `req.session` data directly)
+  - TOKEN mode: Validates JWT token from Authorization header (lightweight validation)
+  - **Important:** This method verifies authentication only and does NOT populate `req.user`
+  - Use `requireUser()` after this middleware to load user data into `req.user`
   - `errorRedirectUrl`: Redirect URL on authentication failure
+  - **Example:**
+    ```javascript
+    // Option 1: Just verify authentication (user data remains in req.session)
+    app.get('/api/check', session.authenticate(), (req, res) => {
+      res.json({ authenticated: true });
+    });
+
+    // Option 2: Verify authentication AND populate req.user (recommended)
+    app.get('/api/profile',
+      session.authenticate(),    // Verifies session/token validity
+      session.requireUser(),     // Loads user data into req.user
+      (req, res) => {
+        res.json({ user: req.user }); // User data now available
+      }
+    );
+    ```
 
 - **`requireUser()`** - Middleware to load full user data into `req.user`
   - SESSION mode: Loads user from session store

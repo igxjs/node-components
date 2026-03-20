@@ -466,7 +466,9 @@ export class SessionManager {
    * @private
    */
   async #verifySession(req, res, next, errorRedirectUrl) {
-    const { authorized = false } = req.user ?? { authorized: false };
+    // Fix: Check session data directly, not req.user (which is only populated by requireUser())
+    const user = req.session[this.#getSessionKey()];
+    const { authorized = false } = user ?? { authorized: false };
     if (authorized) {
       return next();
     }
@@ -760,8 +762,27 @@ export class SessionManager {
 
   /**
    * Resource protection based on configured SESSION_MODE
-   * @param {string} [errorRedirectUrl=''] Redirect URL
+   * - SESSION mode: Verifies user exists in session store and is authorized (checks req.session data)
+   * - TOKEN mode: Validates JWT token from Authorization header (lightweight validation)
+   * 
+   * Note: This method verifies authentication only. Use requireUser() after this to populate req.user.
+   * 
+   * @param {string} [errorRedirectUrl=''] Redirect URL on authentication failure
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
+   * @example
+   * // Option 1: Just verify authentication (user data remains in req.session or token)
+   * app.get('/api/check', session.authenticate(), (req, res) => {
+   *   res.json({ authenticated: true });
+   * });
+   * 
+   * // Option 2: Verify authentication AND load user data into req.user
+   * app.get('/api/profile', 
+   *   session.authenticate(),   // Verifies session/token
+   *   session.requireUser(),     // Loads user data into req.user
+   *   (req, res) => {
+   *     res.json({ user: req.user }); // User data available here
+   *   }
+   * );
    */
   authenticate(errorRedirectUrl = '') {
     return async (req, res, next) => {

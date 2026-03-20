@@ -342,7 +342,7 @@ export class SessionManager {
 
   /**
    * Middleware to load full user data into req.user
-   * - SESSION mode: Loads user from session store
+   * - SESSION mode: Loads user from session store (req.session[SESSION_KEY])
    * - TOKEN mode: Loads user from Redis using JWT token
    * - Provides request-level caching to avoid redundant lookups
    * - Should be used after authenticate() middleware
@@ -350,10 +350,10 @@ export class SessionManager {
    * @example
    * ```javascript
    * app.get('/api/profile',
-   *   session.authenticate(),
-   *   session.requireUser(),
+   *   session.authenticate(),    // Verifies authentication
+   *   session.requireUser(),      // Loads user data into req.user
    *   (req, res) => {
-   *     res.json({ user: req.user });
+   *     res.json({ user: req.user }); // User data available here
    *   }
    * );
    * ```
@@ -362,9 +362,33 @@ export class SessionManager {
 
   /**
    * Resource protection middleware based on configured SESSION_MODE
-   * Uses verifySession() for SESSION mode and verifyToken() for TOKEN mode
-   * @param errorRedirectUrl Redirect URL (default: '')
+   * - SESSION mode: Verifies user exists in session store and is authorized (checks req.session data)
+   * - TOKEN mode: Validates JWT token from Authorization header (lightweight validation)
+   * 
+   * Note: This method verifies authentication only and does NOT populate req.user.
+   * Use requireUser() after this middleware to load user data into req.user.
+   * 
+   * @param errorRedirectUrl Redirect URL on authentication failure (default: '')
    * @returns Returns express Request Handler
+   * @example
+   * ```javascript
+   * // Option 1: Just verify authentication (user data remains in req.session or token)
+   * app.get('/api/check', 
+   *   session.authenticate(), 
+   *   (req, res) => {
+   *     res.json({ authenticated: true });
+   *   }
+   * );
+   * 
+   * // Option 2: Verify authentication AND populate req.user (recommended for most use cases)
+   * app.get('/api/profile',
+   *   session.authenticate(),    // Verifies session/token validity
+   *   session.requireUser(),      // Loads user data into req.user
+   *   (req, res) => {
+   *     res.json({ user: req.user }); // User data now available
+   *   }
+   * );
+   * ```
    */
   authenticate(errorRedirectUrl?: string): RequestHandler;
 
