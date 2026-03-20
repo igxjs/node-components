@@ -230,7 +230,8 @@ await session.setup(app, (user) => ({
 }));
 
 // Protect routes with session authentication
-app.get('/protected', session.authenticate(), (req, res) => {
+// requireUser() middleware loads user data into req.user
+app.get('/protected', session.authenticate(), session.requireUser(), (req, res) => {
   res.json({ user: req.user });
 });
 
@@ -294,7 +295,8 @@ await session.setup(app, (user) => ({
 
 // Protect routes with token authentication
 // Client must send: Authorization: Bearer {token}
-app.get('/api/protected', session.authenticate(), (req, res) => {
+// requireUser() middleware loads user data from Redis into req.user
+app.get('/api/protected', session.authenticate(), session.requireUser(), (req, res) => {
   res.json({ user: req.user });
 });
 
@@ -384,6 +386,60 @@ fetch('/api/auth/logout?all=true', {
 });
 ```
 
+## Using requireUser() Middleware
+
+The `requireUser()` middleware is designed to load full user data into `req.user` for both SESSION and TOKEN modes. This middleware should be used after authentication middleware.
+
+### SESSION Mode Usage
+
+```javascript
+// User data is loaded from session store
+app.get('/api/profile',
+  session.authenticate(),
+  session.requireUser(),
+  (req, res) => {
+    // req.user contains full user data from session
+    res.json({
+      email: req.user.email,
+      displayName: req.user.displayName,
+      attributes: req.user.attributes
+    });
+  }
+);
+```
+
+### TOKEN Mode Usage
+
+```javascript
+// User data is loaded from Redis using the JWT token
+app.get('/api/profile',
+  session.authenticate(),  // Validates JWT token
+  session.requireUser(),   // Loads user data from Redis
+  (req, res) => {
+    // req.user contains full user data from Redis
+    res.json({
+      email: req.user.email,
+      displayName: req.user.displayName,
+      attributes: req.user.attributes
+    });
+  }
+);
+```
+
+### Benefits of requireUser()
+
+1. **Request-level caching** - User data is loaded once per request
+2. **Consistent API** - Works the same way for both SESSION and TOKEN modes
+3. **Separation of concerns** - Authentication and data loading are separate steps
+4. **Performance** - Avoids redundant Redis lookups in TOKEN mode
+
+### When to Use
+
+- ✅ Use when you need full user data in your route handlers
+- ✅ Use after `authenticate()` or `verifyToken()`/`verifySession()`
+- ✅ Use for routes that need user profile information
+- ❌ Don't use if you only need to verify authentication (use `authenticate()` alone)
+
 ## API Methods
 
 ### Core Methods
@@ -397,6 +453,18 @@ fetch('/api/auth/logout?all=true', {
   - Uses `verifyToken()` for TOKEN mode
   - `isDebugging`: Skip authentication checks (default: false)
   - `redirectUrl`: Redirect URL on authentication failure
+
+- **`requireUser()`** - Middleware to load full user data into `req.user`
+  - SESSION mode: Loads user from session store
+  - TOKEN mode: Loads user from Redis using token
+  - Provides request-level caching
+  - Should be used after `authenticate()` middleware
+  - **Example:**
+    ```javascript
+    app.get('/api/profile', session.authenticate(), session.requireUser(), (req, res) => {
+      res.json({ user: req.user }); // User data available here
+    });
+    ```
 
 - **`verifySession(isDebugging?, redirectUrl?)`** - Explicit session-based authentication
   - Forces session verification regardless of SESSION_MODE
@@ -428,6 +496,7 @@ fetch('/api/auth/logout?all=true', {
   - Query params:
     - `redirect=true`: Redirect to SSO_SUCCESS_URL/SSO_FAILURE_URL
     - `all=true`: Logout all tokens for user (TOKEN mode only)
+  - Returns count of tokens removed when logging out all tokens
 
 ### Utility Methods
 
@@ -499,7 +568,7 @@ Each device/session gets a unique `tid`, allowing users to be authenticated on m
 
 ## Session Refresh Locks
 
-SessionManager includes built-in protection against concurrent refresh operations:
+SessionManager includes built-in protection against concurrent refresh operations to prevent race conditions:
 
 ```javascript
 // Lock is automatically set during refresh operations
@@ -513,6 +582,12 @@ session.lock(email); // Sets 60-second lock
 // ... perform refresh operation ...
 // Lock automatically expires after 60 seconds
 ```
+
+**Key Features:**
+- Prevents concurrent token/session refresh attacks
+- 60-second lock duration
+- Automatic lock expiration
+- Used internally by `refresh()` method
 
 ## SESSION_KEY and SESSION_EXPIRY_KEY Configuration Explained
 
@@ -621,7 +696,7 @@ if (new Date(expiresAt) < new Date()) {
 
 ## Error Handling
 
-SessionManager throws `CustomError` instances for various failure scenarios:
+SessionManager throws `CustomError` instances for various failure scenarios with improved error detection:
 
 ```javascript
 import { httpCodes } from '@igxjs/node-components';
@@ -633,6 +708,10 @@ import { httpCodes } from '@igxjs/node-components';
 // - httpCodes.BAD_REQUEST (400): Invalid JWT payload
 // - httpCodes.SYSTEM_FAILURE (500): Redis connection or other system errors
 
+// Enhanced JWT error detection:
+// - ERR_JWT_EXPIRED: Specific handling for expired tokens
+// - Better error messages for debugging
+
 // Handle errors in your error middleware
 app.use((err, req, res, next) => {
   if (err.code === httpCodes.UNAUTHORIZED) {
@@ -642,6 +721,12 @@ app.use((err, req, res, next) => {
   // ... handle other errors
 });
 ```
+
+**Improved Error Handling Features:**
+- Specific JWT error code detection (`ERR_JWT_EXPIRED`)
+- More descriptive error messages
+- Better debugging support in development mode
+- Consistent error format across SESSION and TOKEN modes
 
 ## Migrating from SESSION to TOKEN Mode
 

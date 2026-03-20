@@ -137,6 +137,8 @@ export class SessionManager {
   #jwtManager = null;
   /** @type {import('./logger.js').Logger} */
   #logger = Logger.getInstance('SessionManager');
+  /** @type {string?} Cached HTML template for token storage */
+  #htmlTemplate = null;
 
   /**
    * Create a new session manager
@@ -309,25 +311,49 @@ export class SessionManager {
   async #generateAndStoreToken(user) {
     // Generate unique token ID for this device/session
     const tid = crypto.randomUUID();
-    // SESSION_AGE is already in seconds
-    const ttlSeconds = this.#config.SESSION_AGE;
     // Create JWT token with only email and tid (minimal payload)
-    const token = await this.#jwtManager.encrypt(
-      { email: user.email, tid },
-      this.#config.SESSION_SECRET,
-      { expirationTime: ttlSeconds }
-    );
+    const payload = { email: user.email, tid };
+    const token = await this.#jwtManager.encrypt(payload, this.#config.SESSION_SECRET, { expirationTime: this.#config.SESSION_AGE });
 
     // Store user data in Redis with TTL
     const redisKey = this.#getTokenRedisKey(user.email, tid);
 
-    await this.#redisManager.getClient().setEx(
-      redisKey,
-      ttlSeconds,
-      JSON.stringify(user)
-    );
+    await this.#redisManager.getClient().setEx(redisKey, this.#config.SESSION_AGE, JSON.stringify(user));
     this.#logger.debug(`### TOKEN GENERATED: ${user.email} ###`);
     return token;
+  }
+
+  /**
+   * Get user from authorization header
+   * @param {string} authHeader Auth header
+   * @param {string} fetchFromRedis Fetch from Redis
+   * @returns {Promise<{ tid: string, user: object }>} Returns user object
+   */
+  async #getUserFromHeader(authHeader, fetchFromRedis = true) {
+    if (!authHeader?.startsWith('Bearer ')) {
+      throw new CustomError(httpCodes.UNAUTHORIZED, 'Missing or invalid authorization header');
+    }
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    // Decrypt JWT token
+    const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
+
+    if (fetchFromRedis) {
+      /** @type {{ email: string, tid: string }} Extract email and token ID */
+      const { email, tid } = payload;
+      if (!email || !tid) {
+        throw new CustomError(httpCodes.UNAUTHORIZED, 'Invalid token payload');
+      }
+
+      // Lookup user in Redis
+      const redisKey = this.#getTokenRedisKey(email, tid);
+      const userData = await this.#redisManager.getClient().get(redisKey);
+
+      if (!userData) {
+        throw new CustomError(httpCodes.UNAUTHORIZED, 'Token not found or expired');
+      }
+      return { tid, user: JSON.parse(userData) };
+    }
+    return payload;
   }
 
   /**
@@ -345,39 +371,11 @@ export class SessionManager {
    */
   async #verifyToken(req, res, next, isDebugging, redirectUrl) {
     try {
-      // Extract token from Authorization header
-      const authHeader = req.headers.authorization;
-      if (!authHeader?.startsWith('Bearer ')) {
-        throw new CustomError(httpCodes.UNAUTHORIZED, 'Missing or invalid authorization header');
-      }
-
-      const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-      // Decrypt JWT token
-      const { payload } = await this.#jwtManager.decrypt(
-        token,
-        this.#config.SESSION_SECRET
-      );
-
-      // Extract email and token ID
-      const { email, tid } = payload;
-      if (!email || !tid) {
-        throw new CustomError(httpCodes.UNAUTHORIZED, 'Invalid token payload');
-      }
-
       // Lookup user in Redis
-      const redisKey = this.#getTokenRedisKey(email, tid);
-      const userData = await this.#redisManager.getClient().get(redisKey);
-
-      if (!userData) {
-        throw new CustomError(httpCodes.UNAUTHORIZED, 'Token not found or expired');
-      }
-
-      // Parse and attach user to request
-      req.user = JSON.parse(userData);
+      const { user } = await this.#getUserFromHeader(req.headers.authorization, false);
 
       // Validate authorization
-      const { authorized = isDebugging } = req.user ?? { authorized: isDebugging };
+      const { authorized = isDebugging } = user ?? { authorized: isDebugging };
       if (!authorized && !isDebugging) {
         throw new CustomError(httpCodes.FORBIDDEN, 'User is not authorized');
       }
@@ -432,38 +430,28 @@ export class SessionManager {
    * @param {import('@types/express').Response} res Response object
    * @param {import('@types/express').NextFunction} next Next middleware function
    * @param {(user: object) => object} initUser Function to initialize/transform user object
-   * @param {string} idpUrl Identity provider refresh endpoint URL
+   * @param {string} idpRefreshUrl Identity provider refresh endpoint URL
    * @throws {CustomError} If refresh lock is active or SSO refresh fails
    * @private
    * @example
    * // Response format:
-   * // { token: "new_jwt", user: {...}, expiresIn: 64800, tokenType: "Bearer" }
+   * // { jwt: "new_jwt", user: {...}, expires_at: 64800, token_type: "Bearer" }
    */
-  async #refreshToken(req, res, next, initUser, idpUrl) {
+  async #refreshToken(req, res, next, initUser, idpRefreshUrl) {
     try {
-      // Get current user from verifyToken middleware
-      const { email, attributes } = req.user || {};
-
-      if (!email) {
-        throw new CustomError(httpCodes.UNAUTHORIZED, 'User not authenticated');
-      }
-
-      // Extract Token ID from current token
-      const authHeader = req.headers.authorization;
-      const token = authHeader?.substring(7);
-      const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
-      const { tid: oldTokenId } = payload;
+      /** @type {{ tid: string, user: { email: string, attributes: { idp: string, refresh_token: string }? } }} */
+      const { tid, user } = await this.#getUserFromHeader(req.headers.authorization);
 
       // Check refresh lock
-      if (this.hasLock(email)) {
+      if (this.hasLock(user.email)) {
         throw new CustomError(httpCodes.CONFLICT, 'Token refresh is locked');
       }
-      this.lock(email);
+      this.lock(user.email);
 
       // Call SSO refresh endpoint
-      const response = await this.#idpRequest.post(idpUrl, {
+      const response = await this.#idpRequest.post(idpRefreshUrl, {
         user: {
-          email,
+          email: user.email,
           attributes: {
             idp: attributes?.idp,
             refresh_token: attributes?.refresh_token
@@ -484,24 +472,19 @@ export class SessionManager {
       }
 
       // Initialize user with new data
-      const user = initUser(newPayload.user);
+      const newUser = initUser(newPayload.user);
 
       // Generate new token
-      const newToken = await this.#generateAndStoreToken(user);
+      const newToken = await this.#generateAndStoreToken(newUser);
 
       // Remove old token from Redis
-      const oldRedisKey = this.#getTokenRedisKey(email, oldTokenId);
+      const oldRedisKey = this.#getTokenRedisKey(email, tid);
       await this.#redisManager.getClient().del(oldRedisKey);
 
       this.#logger.debug('### TOKEN REFRESHED SUCCESSFULLY ###');
 
       // Return new token
-      return res.json({
-        token: newToken,
-        user,
-        expiresIn: this.#config.SESSION_AGE, // Already in seconds
-        tokenType: 'Bearer'
-      });
+      return res.json({ jwt: newToken, user: newUser, expires_at: this.#config.SESSION_AGE, token_type: 'Bearer' });
     } catch (error) {
       return next(httpHelper.handleAxiosError(error));
     }
@@ -513,17 +496,17 @@ export class SessionManager {
    * @param {import('@types/express').Response} res Response
    * @param {import('@types/express').NextFunction} next Next function
    * @param {(user: object) => object} initUser Initialize user function
-   * @param {string} idpUrl Identity provider URL
+   * @param {string} idpRefreshUrl Token Refresh URL
    * @private
    */
-  async #refreshSession(req, res, next, initUser, idpUrl) {
+  async #refreshSession(req, res, next, initUser, idpRefreshUrl) {
     try {
       const { email, attributes } = req.user || { email: '', attributes: {} };
       if (this.hasLock(email)) {
         throw new CustomError(httpCodes.CONFLICT, 'User refresh is locked');
       }
       this.lock(email);
-      const response = await this.#idpRequest.post(idpUrl, {
+      const response = await this.#idpRequest.post(idpRefreshUrl, {
         user: {
           email,
           attributes: {
@@ -673,22 +656,33 @@ export class SessionManager {
   /**
    * Setup the session/user handlers with configurations
    * @param {import('@types/express').Application} app Express application
-   * @param {(user: object) => object} updateUser Update user object if user should have proper attributes, e.g. permissions, avatar URL
+   * @param {(user: object) => object} updateUser Update user function
    */
-  async setup(app, updateUser) {
+  async setup(app) {
     this.#redisManager = new RedisManager();
     this.#jwtManager = new JwtManager({
       ...this.#config,
       JWT_EXPIRATION_TIME: this.#config.SESSION_AGE, // SESSION_AGE is already in seconds
     });
+
     // Identity Provider Request
     this.#idpRequest = axios.create({
       baseURL: this.#config.SSO_ENDPOINT_URL,
       timeout: 30000,
     });
     app.set('trust proxy', 1);
-    app.use(await this.#sessionHandler());
-    app.use(this.#userHandler(updateUser));
+    const isOK = await this.#redisManager.connect(this.#config.REDIS_URL, this.#config.REDIS_CERT_PATH);
+    if (this.#config.SESSION_MODE === SessionMode.SESSION) {
+      app.use(this.#sessionHandler(isOK));
+    }
+    
+    // Cache HTML template for TOKEN mode
+    if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+      const templatePath = this.#config.TOKEN_STORAGE_TEMPLATE_PATH ||
+        path.resolve(__dirname, 'assets', 'template.html');
+      this.#htmlTemplate = fs.readFileSync(templatePath, 'utf8');
+      this.#logger.debug('### HTML TEMPLATE CACHED ###');
+    }
   }
 
   /**
@@ -724,29 +718,32 @@ export class SessionManager {
 
   /**
    * Get session RequestHandler
-   * @returns {Promise<import('@types/express').RequestHandler>} Returns RequestHandler instance of Express
+   * @param {boolean} isRedisReady Is Redis Ready
+   * @returns {import('@types/express').RequestHandler} Returns RequestHandler instance of Express
    */
-  async #sessionHandler() {
-    if(this.#config.REDIS_URL?.length > 0) {
-      await this.#redisManager.connect(this.#config.REDIS_URL, this.#config.REDIS_CERT_PATH);
+  #sessionHandler(isRedisReady) {
+    if(isRedisReady) {
       return this.#redisSession();
     }
     return this.#memorySession();
   }
 
   /**
-   * User HTTP Handler
-   * @param {(user: object) => object} updateUser User wrapper
+   * Middleware to load full user data from Redis (with request-level caching)
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
-  #userHandler (updateUser) {
-    return (req, res, next) => {
-      req.user = req.session[this.#getSessionKey()];
-      /** @type {import('@types/express').Request & { user: object }} Session user */
-      res.locals.user = updateUser(req.user);
+  requireUser = () => {
+    return async (req, res, next) => {
+      if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+        const { user } = await this.#getUserFromHeader(req.headers.authorization, true);
+        req.user = user;
+      }
+      else {
+        req.user = req.session[this.#getSessionKey()];
+      }
       return next();
     };
-  }
+  };
 
   /**
    * Resource protection based on configured SESSION_MODE
@@ -813,62 +810,77 @@ export class SessionManager {
       });
     }
     throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
-  };
-
-  /**
-   * SSO callback for successful login
-   * @param {(user: object) => object} initUser Initialize user object function
-   * @returns {import('@types/express').RequestHandler} Returns express Request Handler
-   */
-  callback(initUser) {
-    return async (req, res, next) => {
-      const { jwt = '' } = req.query;
-      if (!jwt) {
-        return next(new CustomError(httpCodes.BAD_REQUEST, 'Missing `jwt` in query parameters'));
-      }
-
-      try {
-        // Decrypt JWT from Identity Adapter
-        const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
-        
-        if (!payload?.user) {
-          throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
-        }
-
-        /** @type {import('../index.js').SessionUser} */
-        const user = initUser(payload.user);
-        /** @type {string} */
-        const redirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
-
-        // Check SESSION_MODE to determine response type
-        if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
-          // Token-based: Generate token and return HTML page that stores it
-          const token = await this.#generateAndStoreToken(user);
-
-          this.#logger.debug('### CALLBACK TOKEN GENERATED ###');
-
-          const templatePath = this.#config.TOKEN_STORAGE_TEMPLATE_PATH || path.resolve(__dirname, 'assets', 'template.html');
-          // Return HTML page that stores token in localStorage and redirects
-          const template = fs.readFileSync(templatePath, 'utf8');
-          const html = template
-            .replaceAll('{{SESSION_DATA_KEY}}', this.#config.SESSION_KEY)
-            .replaceAll('{{SESSION_DATA_VALUE}}', token)
-            .replaceAll('{{SESSION_EXPIRY_KEY}}', this.#config.SESSION_EXPIRY_KEY)
-            .replaceAll('{{SESSION_EXPIRY_VALUE}}', user.attributes.expires_at)
-            .replaceAll('{{SSO_SUCCESS_URL}}', redirectUrl)
-            .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
-          return res.send(html);
-        }
-        // Session-based: Save to session and redirect
-        await this.#saveSession(req, jwt, initUser);
-        return res.redirect(redirectUrl);
-      }
-      catch (error) {
-        this.#logger.error('### CALLBACK ERROR ###', error);
-        return res.redirect(this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(error.message)));
-      }
     };
-  }
+  
+    /**
+     * Render HTML template for token storage
+     * @param {string} token JWT token
+     * @param {string} expiresAt Expiry timestamp
+     * @param {string} redirectUrl Success redirect URL
+     * @returns {string} Rendered HTML
+     * @private
+     */
+    #renderTokenStorageHtml(token, expiresAt, redirectUrl) {
+      return this.#htmlTemplate
+        .replaceAll('{{SESSION_DATA_KEY}}', this.#config.SESSION_KEY)
+        .replaceAll('{{SESSION_DATA_VALUE}}', token)
+        .replaceAll('{{SESSION_EXPIRY_KEY}}', this.#config.SESSION_EXPIRY_KEY)
+        .replaceAll('{{SESSION_EXPIRY_VALUE}}', expiresAt)
+        .replaceAll('{{SSO_SUCCESS_URL}}', redirectUrl)
+        .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
+    }
+  
+    /**
+     * SSO callback for successful login
+     * @param {(user: object) => object} initUser Initialize user object function
+     * @returns {import('@types/express').RequestHandler} Returns express Request Handler
+     */
+    callback(initUser) {
+      return async (req, res, next) => {
+        const { jwt = '' } = req.query;
+        if (!jwt) {
+          return next(new CustomError(httpCodes.BAD_REQUEST, 'Missing `jwt` in query parameters'));
+        }
+  
+        try {
+          // Decrypt JWT from Identity Adapter
+          const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
+          
+          if (!payload?.user) {
+            throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
+          }
+  
+          /** @type {import('../index.js').SessionUser} */
+          const user = initUser(payload.user);
+          /** @type {string} */
+          const redirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
+  
+          // Token mode: Generate token and return HTML page
+          if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+            const token = await this.#generateAndStoreToken(user);
+            this.#logger.debug('### CALLBACK TOKEN GENERATED ###');
+            const html = this.#renderTokenStorageHtml(token, user.attributes.expires_at, redirectUrl);
+            return res.send(html);
+          }
+          
+          // Session mode: Save to session and redirect
+          await this.#saveSession(req, jwt, initUser);
+          return res.redirect(redirectUrl);
+        }
+        catch (error) {
+          this.#logger.error('### CALLBACK ERROR ###', error);
+          let errorMessage = error.message;
+          if (error.code === 'ERR_JWT_EXPIRED') {
+            errorMessage = 'Authentication token expired';
+          } else if (error.code === 'ERR_JWT_INVALID') {
+            errorMessage = 'Invalid authentication token';
+          }
+          return res.redirect(
+            this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(errorMessage))
+          );
+        }
+      };
+    }
 
   /**
    * Get Identity Providers
@@ -896,14 +908,14 @@ export class SessionManager {
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
   refresh(initUser) {
-    const idpUrl = '/auth/refresh'.concat('?client_id=').concat(this.#config.SSO_CLIENT_ID);
+    const idpRefreshUrl = '/auth/refresh'.concat('?client_id=').concat(this.#config.SSO_CLIENT_ID);
     return async (req, res, next) => {
       const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
-      
+
       if (mode === SessionMode.TOKEN) {
-        return this.#refreshToken(req, res, next, initUser, idpUrl);
+        return this.#refreshToken(req, res, next, initUser, idpRefreshUrl);
       } else {
-        return this.#refreshSession(req, res, next, initUser, idpUrl);
+        return this.#refreshSession(req, res, next, initUser, idpRefreshUrl);
       }
     };
   }

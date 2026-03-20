@@ -48,8 +48,8 @@ export const tokenSession = new SessionManager({
 // Setup in your app
 await session.setup(app, (user) => ({ ...user, displayName: user.email }));
 
-// Protect routes
-app.get('/protected', session.authenticate(), (req, res) => {
+// Protect routes - user data automatically loaded into req.user
+app.get('/protected', session.authenticate(), session.requireUser(), (req, res) => {
   res.json({ user: req.user });
 });
 ```
@@ -133,6 +133,7 @@ Uses traditional server-side session cookies. When a user authenticates via SSO,
 **Auth Methods:**
 - `session.authenticate()` - Protect routes with SSO session verification
 - `session.verifySession(isDebugging, redirectUrl)` - Explicit session verification method
+- `session.requireUser()` - Middleware to load user data into `req.user`
 - `session.logout(redirect?, all?)` - Logout current session (or logout all for token mode)
 
 ### TOKEN Mode
@@ -149,9 +150,10 @@ Uses JWT bearer tokens instead of session cookies. When a user authenticates via
 
 **Auth Methods:**
 - `session.verifyToken(isDebugging, redirectUrl)` - Protect routes with token verification
+- `session.requireUser()` - Middleware to load user data into `req.user` from Redis
 - `session.callback(initUser)` - SSO callback handler for token generation
 - `session.refresh(initUser)` - Refresh user authentication based on auth mode
-- `session.logout(redirect?, all?)` - Logout current or all tokens
+- `session.logout(redirect?, all?)` - Logout current token or all tokens for user
 
 **Token Storage (Client-Side):**
 
