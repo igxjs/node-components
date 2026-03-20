@@ -137,8 +137,8 @@ Uses traditional server-side session cookies. When a user authenticates via SSO,
 - `REDIS_URL`: Redis connection string for session storage
 
 **Auth Methods:**
-- `session.authenticate()` - Protect routes with SSO session verification
-- `session.verifySession(isDebugging, redirectUrl)` - Explicit session verification method
+- `session.authenticate(errorRedirectUrl)` - Protect routes with SSO session verification
+- `session.verifySession(errorRedirectUrl)` - Explicit session verification method
 - `session.requireUser()` - Middleware to load user data into `req.user` from session store
 - `session.logout(redirect?, all?)` - Logout current session (or logout all for token mode)
 
@@ -155,7 +155,7 @@ Uses JWT bearer tokens instead of session cookies. When a user authenticates via
 - `JWT_CLOCK_TOLERANCE`: Clock skew tolerance in seconds (default: 30)
 
 **Auth Methods:**
-- `session.verifyToken(isDebugging, redirectUrl)` - Protect routes with token verification
+- `session.verifyToken(errorRedirectUrl)` - Protect routes with token verification
 - `session.requireUser()` - Middleware to load user data into `req.user` from Redis using JWT token
 - `session.callback(initUser)` - SSO callback handler for token generation
 - `session.refresh(initUser)` - Refresh user authentication based on auth mode

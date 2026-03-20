@@ -363,28 +363,25 @@ export class SessionManager {
   /**
    * Resource protection middleware based on configured SESSION_MODE
    * Uses verifySession() for SESSION mode and verifyToken() for TOKEN mode
-   * @param isDebugging Debugging flag (default: false)
-   * @param redirectUrl Redirect URL (default: '')
+   * @param errorRedirectUrl Redirect URL (default: '')
    * @returns Returns express Request Handler
    */
-  authenticate(isDebugging?: boolean, redirectUrl?: string): RequestHandler;
+  authenticate(errorRedirectUrl?: string): RequestHandler;
 
   /**
    * Resource protection by token (explicit token verification)
    * Requires Authorization: Bearer {token} header
-   * @param isDebugging Debugging flag (default: false)
-   * @param redirectUrl Redirect URL (default: '')
+   * @param errorRedirectUrl Redirect URL (default: '')
    * @returns Returns express Request Handler
    */
-  verifyToken(isDebugging?: boolean, redirectUrl?: string): RequestHandler;
+  verifyToken(errorRedirectUrl?: string): RequestHandler;
 
   /**
    * Resource protection by session (explicit session verification)
-   * @param isDebugging Debugging flag (default: false)
-   * @param redirectUrl Redirect URL (default: '')
+   * @param errorRedirectUrl Redirect URL (default: '')
    * @returns Returns express Request Handler
    */
-  verifySession(isDebugging?: boolean, redirectUrl?: string): RequestHandler;
+  verifySession(errorRedirectUrl?: string): RequestHandler;
 
   /**
    * SSO callback for successful login

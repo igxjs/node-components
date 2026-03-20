@@ -445,11 +445,10 @@ app.get('/api/profile',
   - `app`: Express application instance
   - Note: User transformation is done in `callback()` and `refresh()` methods, not in `setup()`
 
-- **`authenticate(isDebugging?, redirectUrl?)`** - Protect routes based on configured SESSION_MODE
+- **`authenticate(errorRedirectUrl?)`** - Protect routes based on configured SESSION_MODE
   - Uses `verifySession()` for SESSION mode
   - Uses `verifyToken()` for TOKEN mode
-  - `isDebugging`: Skip authentication checks (default: false)
-  - `redirectUrl`: Redirect URL on authentication failure
+  - `errorRedirectUrl`: Redirect URL on authentication failure
 
 - **`requireUser()`** - Middleware to load full user data into `req.user`
   - SESSION mode: Loads user from session store
@@ -463,16 +462,14 @@ app.get('/api/profile',
     });
     ```
 
-- **`verifySession(isDebugging?, redirectUrl?)`** - Explicit session-based authentication
+- **`verifySession(errorRedirectUrl?)`** - Explicit session-based authentication
   - Forces session verification regardless of SESSION_MODE
-  - `isDebugging`: Skip authentication checks (default: false)
-  - `redirectUrl`: Redirect URL on authentication failure
+  - `errorRedirectUrl`: Redirect URL on authentication failure
 
-- **`verifyToken(isDebugging?, redirectUrl?)`** - Explicit token-based authentication
+- **`verifyToken(errorRedirectUrl?)`** - Explicit token-based authentication
   - Forces token verification regardless of SESSION_MODE
   - Requires `Authorization: Bearer {token}` header
-  - `isDebugging`: Skip authentication checks (default: false)
-  - `redirectUrl`: Redirect URL on authentication failure
+  - `errorRedirectUrl`: Redirect URL on authentication failure
 
 - **`callback(initUser)`** - SSO callback handler for successful login
   - `initUser`: Function to transform SSO user object

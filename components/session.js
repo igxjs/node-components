@@ -429,36 +429,21 @@ export class SessionManager {
    * @param {import('@types/express').Request} req Request with Authorization header
    * @param {import('@types/express').Response} res Response object
    * @param {import('@types/express').NextFunction} next Next middleware function
-   * @param {boolean} isDebugging If true, allows unauthenticated requests
-   * @param {string} redirectUrl URL to redirect to on authentication failure
+   * @param {string} errorRedirectUrl URL to redirect to on authentication failure
    * @throws {CustomError} If token is missing, invalid, or expired
    * @private
    * @example
    * // Authorization header format: "Bearer {jwt_token}"
-   * await this.#verifyToken(req, res, next, false, '/login');
+   * await this.#verifyToken(req, res, next, '/login');
    */
-  async #verifyToken(req, res, next, isDebugging, redirectUrl) {
+  async #verifyToken(req, res, next, errorRedirectUrl) {
     try {
       // Lightweight token validation (no Redis lookup)
-      const payload = await this.#getUserFromToken(req.headers.authorization, false);
-      const { user } = payload || {};
-
-      // Validate authorization
-      const { authorized = isDebugging } = user ?? { authorized: isDebugging };
-      if (!authorized && !isDebugging) {
-        throw new CustomError(httpCodes.FORBIDDEN, 'User is not authorized');
-      }
-
+      await this.#getUserFromToken(req.headers.authorization, false);
       return next();
-
     } catch (error) {
-      if (isDebugging) {
-        this.#logger.warn('### TOKEN VERIFICATION FAILED (debugging mode) ###', error.message);
-        return next();
-      }
-
-      if (redirectUrl) {
-        return res.redirect(redirectUrl);
+      if (errorRedirectUrl) {
+        return res.redirect(errorRedirectUrl);
       }
 
       // Handle specific JWT errors
@@ -476,18 +461,17 @@ export class SessionManager {
    * @param {import('@types/express').Request} req Request with session data
    * @param {import('@types/express').Response} res Response object
    * @param {import('@types/express').NextFunction} next Next middleware function
-   * @param {boolean} isDebugging If true, allows unauthorized users
-   * @param {string} redirectUrl URL to redirect to if user is unauthorized
+   * @param {string} errorRedirectUrl URL to redirect to if user is unauthorized
    * @throws {CustomError} If user is not authorized
    * @private
    */
-  async #verifySession(req, res, next, isDebugging, redirectUrl) {
-    const { authorized = isDebugging } = req.user ?? { authorized: isDebugging };
+  async #verifySession(req, res, next, errorRedirectUrl) {
+    const { authorized = false } = req.user ?? { authorized: false };
     if (authorized) {
       return next();
     }
-    if (redirectUrl) {
-      return res.redirect(redirectUrl);
+    if (errorRedirectUrl) {
+      return res.redirect(errorRedirectUrl);
     }
     return next(new CustomError(httpCodes.UNAUTHORIZED, httpMessages.UNAUTHORIZED));
   }
@@ -776,41 +760,38 @@ export class SessionManager {
 
   /**
    * Resource protection based on configured SESSION_MODE
-   * @param {boolean} [isDebugging=false] Debugging flag
-   * @param {string} [redirectUrl=''] Redirect URL
+   * @param {string} [errorRedirectUrl=''] Redirect URL
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
-  authenticate(isDebugging = false, redirectUrl = '') {
+  authenticate(errorRedirectUrl = '') {
     return async (req, res, next) => {
       const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
       if (mode === SessionMode.TOKEN) {
-        return this.#verifyToken(req, res, next, isDebugging, redirectUrl);
+        return this.#verifyToken(req, res, next, errorRedirectUrl);
       }
-      return this.#verifySession(req, res, next, isDebugging, redirectUrl);
+      return this.#verifySession(req, res, next, errorRedirectUrl);
     };
   }
 
   /**
    * Resource protection by token (explicit token verification)
-   * @param {boolean} [isDebugging=false] Debugging flag
-   * @param {string} [redirectUrl=''] Redirect URL
+   * @param {string} [errorRedirectUrl=''] Redirect URL
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
-  verifyToken(isDebugging = false, redirectUrl = '') {
+  verifyToken(errorRedirectUrl = '') {
     return async (req, res, next) => {
-      return this.#verifyToken(req, res, next, isDebugging, redirectUrl);
+      return this.#verifyToken(req, res, next, errorRedirectUrl);
     };
   }
 
   /**
    * Resource protection by session (explicit session verification)
-   * @param {boolean} [isDebugging=false] Debugging flag
-   * @param {string} [redirectUrl=''] Redirect URL
+   * @param {string} [errorRedirectUrl=''] Redirect URL
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
-  verifySession(isDebugging = false, redirectUrl = '') {
+  verifySession(errorRedirectUrl = '') {
     return async (req, res, next) => {
-      return this.#verifySession(req, res, next, isDebugging, redirectUrl);
+      return this.#verifySession(req, res, next, errorRedirectUrl);
     };
   }
 
@@ -845,17 +826,17 @@ export class SessionManager {
      * Render HTML template for token storage
      * @param {string} token JWT token
      * @param {string} expiresAt Expiry timestamp
-     * @param {string} redirectUrl Success redirect URL
+     * @param {string} sucessRedirectUrl Success redirect URL
      * @returns {string} Rendered HTML
      * @private
      */
-    #renderTokenStorageHtml(token, expiresAt, redirectUrl) {
+    #renderTokenStorageHtml(token, expiresAt, sucessRedirectUrl) {
       return this.#htmlTemplate
         .replaceAll('{{SESSION_DATA_KEY}}', this.#config.SESSION_KEY)
         .replaceAll('{{SESSION_DATA_VALUE}}', token)
         .replaceAll('{{SESSION_EXPIRY_KEY}}', this.#config.SESSION_EXPIRY_KEY)
         .replaceAll('{{SESSION_EXPIRY_VALUE}}', expiresAt)
-        .replaceAll('{{SSO_SUCCESS_URL}}', redirectUrl)
+        .replaceAll('{{SSO_SUCCESS_URL}}', sucessRedirectUrl)
         .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
     }
   
@@ -882,19 +863,19 @@ export class SessionManager {
           /** @type {import('../index.js').SessionUser} */
           const user = initUser(payload.user);
           /** @type {string} */
-          const redirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
+          const callbackRedirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
   
           // Token mode: Generate token and return HTML page
           if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
             const token = await this.#generateAndStoreToken(user);
             this.#logger.debug('### CALLBACK TOKEN GENERATED ###');
-            const html = this.#renderTokenStorageHtml(token, user.attributes.expires_at, redirectUrl);
+            const html = this.#renderTokenStorageHtml(token, user.attributes.expires_at, callbackRedirectUrl);
             return res.send(html);
           }
-          
+
           // Session mode: Save to session and redirect
           await this.#saveSession(req, jwt, initUser);
-          return res.redirect(redirectUrl);
+          return res.redirect(callbackRedirectUrl);
         }
         catch (error) {
           this.#logger.error('### CALLBACK ERROR ###', error);
@@ -904,9 +885,7 @@ export class SessionManager {
           } else if (error.code === 'ERR_JWT_INVALID') {
             errorMessage = 'Invalid authentication token';
           }
-          return res.redirect(
-            this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(errorMessage))
-          );
+          return res.redirect(this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(errorMessage)));
         }
       };
     }

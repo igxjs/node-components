@@ -99,20 +99,12 @@ describe('SessionManager', () => {
       expect(error.code).to.equal(httpCodes.UNAUTHORIZED);
     });
 
-    it('should redirect if redirectUrl is provided', () => {
+    it('should redirect if errorRedirectUrl is provided', () => {
       req.user = { authorized: false };
-      const middleware = sessionManager.authenticate(false, '/login');
+      const middleware = sessionManager.authenticate('/login');
       middleware(req, res, next);
       expect(res.redirect.calledWith('/login')).to.be.true;
       expect(next.called).to.be.false;
-    });
-
-    it('should allow access in debug mode', () => {
-      req.user = null;
-      const middleware = sessionManager.authenticate(true);
-      middleware(req, res, next);
-      expect(next.calledOnce).to.be.true;
-      expect(next.firstCall.args).to.be.empty;
     });
   });
 
