@@ -76,13 +76,15 @@ describe('SessionManager', () => {
     let req, res, next;
 
     beforeEach(() => {
-      req = { user: null };
+      // Initialize req.session instead of req.user (SESSION mode checks session data)
+      req = { session: {} };
       res = { redirect: sinon.stub() };
       next = sinon.stub();
     });
 
     it('should call next() if user is authorized', () => {
-      req.user = { authorized: true };
+      // Fix: Set user data in session using SESSION_KEY (default: 'session_token')
+      req.session.session_token = { authorized: true };
       const middleware = sessionManager.authenticate();
       middleware(req, res, next);
       expect(next.calledOnce).to.be.true;
@@ -90,7 +92,8 @@ describe('SessionManager', () => {
     });
 
     it('should call next with error if user is not authorized', () => {
-      req.user = { authorized: false };
+      // Fix: Set user data in session using SESSION_KEY
+      req.session.session_token = { authorized: false };
       const middleware = sessionManager.authenticate();
       middleware(req, res, next);
       expect(next.calledOnce).to.be.true;
@@ -100,7 +103,8 @@ describe('SessionManager', () => {
     });
 
     it('should redirect if errorRedirectUrl is provided', () => {
-      req.user = { authorized: false };
+      // Fix: Set user data in session using SESSION_KEY
+      req.session.session_token = { authorized: false };
       const middleware = sessionManager.authenticate('/login');
       middleware(req, res, next);
       expect(res.redirect.calledWith('/login')).to.be.true;
