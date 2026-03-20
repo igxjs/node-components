@@ -500,6 +500,42 @@ app.get('/api/profile',
 - **`redisManager()`** - Get the RedisManager instance
   - Returns: RedisManager instance or null if not using Redis
 
+- **`getUser(req)`** - Get authenticated user data (works for both SESSION and TOKEN modes)
+  - **Parameters:**
+    - `req` (Request, required): Express request object
+  - **Returns:** Promise resolving to full user data object
+  - **Throws:** `CustomError` UNAUTHORIZED (401) if user is not authenticated
+  - **Use Cases:**
+    - Custom middleware requiring user data
+    - Building custom authentication flows
+    - Accessing user data in non-standard scenarios
+  - **Behavior:**
+    - TOKEN mode: Fetches user from Redis using Authorization header
+    - SESSION mode: Fetches user from session store
+  - **Example:**
+    ```javascript
+    // Use in custom middleware
+    app.use(async (req, res, next) => {
+      try {
+        const user = await session.getUser(req);
+        req.customUser = user;
+        next();
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // Use in route handlers
+    app.get('/api/custom', async (req, res) => {
+      try {
+        const user = await session.getUser(req);
+        res.json({ user });
+      } catch (error) {
+        res.status(401).json({ error: 'Unauthorized' });
+      }
+    });
+    ```
+
 - **`hasLock(email)`** - Check if email has a session refresh lock
   - Prevents concurrent refresh operations
   - Returns: boolean

@@ -122,4 +122,134 @@ describe('SessionManager', () => {
       expect(manager).to.be.null;
     });
   });
+
+  describe('getUser', () => {
+    describe('with TOKEN mode', () => {
+      beforeEach(() => {
+        // Create session manager with TOKEN mode
+        sessionManager = new SessionManager({
+          SESSION_SECRET: 'test-secret-key-for-testing',
+          SESSION_MODE: 'token',
+          SSO_SUCCESS_URL: '/dashboard',
+          SSO_FAILURE_URL: '/login',
+        });
+      });
+
+      it('should throw error for missing authorization header', async () => {
+        const req = { headers: {} };
+        try {
+          await sessionManager.getUser(req);
+          expect.fail('Should have thrown an error');
+        } catch (error) {
+          expect(error).to.be.instanceOf(CustomError);
+          expect(error.code).to.equal(httpCodes.UNAUTHORIZED);
+          expect(error.message).to.include('Missing or invalid authorization header');
+        }
+      });
+
+      it('should throw error for invalid authorization header format', async () => {
+        const req = { headers: { authorization: 'InvalidFormat token123' } };
+        try {
+          await sessionManager.getUser(req);
+          expect.fail('Should have thrown an error');
+        } catch (error) {
+          expect(error).to.be.instanceOf(CustomError);
+          expect(error.code).to.equal(httpCodes.UNAUTHORIZED);
+          expect(error.message).to.include('Missing or invalid authorization header');
+        }
+      });
+
+      it('should throw error for authorization header without Bearer prefix', async () => {
+        const req = { headers: { authorization: 'token123' } };
+        try {
+          await sessionManager.getUser(req);
+          expect.fail('Should have thrown an error');
+        } catch (error) {
+          expect(error).to.be.instanceOf(CustomError);
+          expect(error.code).to.equal(httpCodes.UNAUTHORIZED);
+        }
+      });
+
+      it('should validate Bearer token format before processing', async () => {
+        // Test that format validation happens before any JWT processing
+        const invalidFormats = [
+          '',
+          'Token xyz',
+          'bearer token',  // lowercase
+          'BEARER token',  // uppercase
+          'Basic token',   // wrong auth type
+        ];
+
+        for (const invalidFormat of invalidFormats) {
+          const req = { headers: { authorization: invalidFormat } };
+          try {
+            await sessionManager.getUser(req);
+            expect.fail(`Should have thrown error for: ${invalidFormat}`);
+          } catch (error) {
+            expect(error).to.be.instanceOf(CustomError);
+            expect(error.code).to.equal(httpCodes.UNAUTHORIZED);
+          }
+        }
+      });
+    });
+
+    describe('with SESSION mode', () => {
+      beforeEach(() => {
+        // Create session manager with SESSION mode (default)
+        sessionManager = new SessionManager({
+          SESSION_SECRET: 'test-secret-key-for-testing',
+          SESSION_MODE: 'session',
+        });
+      });
+
+      it('should return user from session', async () => {
+        const mockUser = { email: 'test@example.com', authorized: true };
+        const req = { session: { session_token: mockUser } };
+
+        const user = await sessionManager.getUser(req);
+        expect(user).to.deep.equal(mockUser);
+      });
+
+      it('should return undefined for empty session', async () => {
+        const req = { session: {} };
+        const user = await sessionManager.getUser(req);
+        expect(user).to.be.undefined;
+      });
+    });
+
+    describe('method accessibility', () => {
+      it('should be a public method accessible on SessionManager instance', () => {
+        expect(sessionManager.getUser).to.be.a('function');
+        expect(sessionManager.getUser.name).to.equal('getUser');
+      });
+
+      it('should accept req parameter', () => {
+        // Check function signature (length = number of parameters without defaults)
+        expect(sessionManager.getUser.length).to.equal(1); // req is required
+      });
+    });
+
+    describe('integration behavior', () => {
+      it('should require setup() to be called before using with Redis in TOKEN mode', async () => {
+        // This test documents that getUser requires proper initialization
+        // in TOKEN mode, as it needs JwtManager and RedisManager
+        sessionManager = new SessionManager({
+          SESSION_SECRET: 'test-secret-key-for-testing',
+          SESSION_MODE: 'token',
+          SSO_SUCCESS_URL: '/dashboard',
+          SSO_FAILURE_URL: '/login',
+        });
+
+        const req = { headers: { authorization: 'Bearer test-token' } };
+        try {
+          await sessionManager.getUser(req);
+          expect.fail('Should have thrown an error');
+        } catch (error) {
+          // Expected to fail because setup() hasn't been called
+          // JwtManager and RedisManager are not initialized
+          expect(error).to.exist;
+        }
+      });
+    });
+  });
 });

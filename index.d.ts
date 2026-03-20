@@ -314,6 +314,27 @@ export class SessionManager {
   redisManager(): RedisManager;
 
   /**
+   * Get authenticated user data (works for both SESSION and TOKEN modes)
+   * @param req Express request object
+   * @returns Promise resolving to full user data object
+   * @throws CustomError If user is not authenticated
+   * @example
+   * ```javascript
+   * // Use in custom middleware
+   * app.use(async (req, res, next) => {
+   *   try {
+   *     const user = await sessionManager.getUser(req);
+   *     req.customUser = user;
+   *     next();
+   *   } catch (error) {
+   *     next(error);
+   *   }
+   * });
+   * ```
+   */
+  getUser(req: Request): Promise<SessionUser>;
+
+  /**
    * Initialize the session configurations and middleware
    * @param app Express application
    */

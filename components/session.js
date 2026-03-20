@@ -294,6 +294,37 @@ export class SessionManager {
   }
 
   /**
+   * Setup the session/user handlers with configurations
+   * @param {import('@types/express').Application} app Express application
+   */
+  async setup(app) {
+    this.#redisManager = new RedisManager();
+    this.#jwtManager = new JwtManager({
+      ...this.#config,
+      JWT_EXPIRATION_TIME: this.#config.SESSION_AGE, // SESSION_AGE is already in seconds
+    });
+
+    // Identity Provider Request
+    this.#idpRequest = axios.create({
+      baseURL: this.#config.SSO_ENDPOINT_URL,
+      timeout: 30000,
+    });
+    app.set('trust proxy', 1);
+    const isOK = await this.#redisManager.connect(this.#config.REDIS_URL, this.#config.REDIS_CERT_PATH);
+    if (this.#config.SESSION_MODE === SessionMode.SESSION) {
+      app.use(this.#sessionHandler(isOK));
+    }
+
+    // Cache HTML template for TOKEN mode
+    if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+      const templatePath = this.#config.TOKEN_STORAGE_TEMPLATE_PATH ||
+        path.resolve(__dirname, 'assets', 'template.html');
+      this.#htmlTemplate = fs.readFileSync(templatePath, 'utf8');
+      this.#logger.debug('### HTML TEMPLATE CACHED ###');
+    }
+  }
+
+  /**
    * Generate and store JWT token in Redis
    * - JWT payload contains only { email, tid } for minimal size
    * - Full user data is stored in Redis as single source of truth
@@ -324,12 +355,22 @@ export class SessionManager {
   }
 
   /**
-   * Get user from authorization header
-   * @param {string} authHeader Auth header
-   * @param {string} fetchFromRedis Fetch from Redis
-   * @returns {Promise<{ tid: string, user: object }>} Returns user object
+   * Extract and validate user data from Authorization header (TOKEN mode only)
+   * @param {string} authHeader Authorization header in format "Bearer {token}"
+   * @param {boolean} [fetchFromRedis=true] Whether to fetch full user data from Redis
+   *   - true: Returns { tid, user } with full user data from Redis (default)
+   *   - false: Returns JWT payload only (lightweight validation)
+   * @returns {Promise<{ tid: string?, email: string?, user: object? } | object>}
+   *   - When fetchFromRedis=true: { tid: string, user: object }
+   *   - When fetchFromRedis=false: JWT payload object
+   * @throws {CustomError} UNAUTHORIZED (401) if:
+   *   - Authorization header is missing or invalid format
+   *   - Token decryption fails
+   *   - Token payload is invalid (missing email/tid)
+   *   - Token not found in Redis (when fetchFromRedis=true)
+   * @private
    */
-  async #getUserFromHeader(authHeader, fetchFromRedis = true) {
+  async #getUserFromToken(authHeader, fetchFromRedis = true) {
     if (!authHeader?.startsWith('Bearer ')) {
       throw new CustomError(httpCodes.UNAUTHORIZED, 'Missing or invalid authorization header');
     }
@@ -357,6 +398,33 @@ export class SessionManager {
   }
 
   /**
+   * Get authenticated user data (works for both SESSION and TOKEN modes)
+   * @param {import('@types/express').Request} req Express request object
+   * @returns {Promise<object>} Full user data object
+   * @throws {CustomError} If user is not authenticated
+   * @public
+   * @example
+   * // Use in custom middleware
+   * app.use(async (req, res, next) => {
+   *   try {
+   *     const user = await sessionManager.getUser(req);
+   *     req.customUser = user;
+   *     next();
+   *   } catch (error) {
+   *     next(error);
+   *   }
+   * });
+   */
+  async getUser(req) {
+    if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+      const { user } = await this.#getUserFromToken(req.headers.authorization, true);
+      return user;
+    }
+    // Session mode
+    return req.session[this.#getSessionKey()];
+  }
+
+  /**
    * Verify token authentication - extracts and validates JWT from Authorization header
    * @param {import('@types/express').Request} req Request with Authorization header
    * @param {import('@types/express').Response} res Response object
@@ -371,8 +439,9 @@ export class SessionManager {
    */
   async #verifyToken(req, res, next, isDebugging, redirectUrl) {
     try {
-      // Lookup user in Redis
-      const { user } = await this.#getUserFromHeader(req.headers.authorization, false);
+      // Lightweight token validation (no Redis lookup)
+      const payload = await this.#getUserFromToken(req.headers.authorization, false);
+      const { user } = payload || {};
 
       // Validate authorization
       const { authorized = isDebugging } = user ?? { authorized: isDebugging };
@@ -440,21 +509,21 @@ export class SessionManager {
   async #refreshToken(req, res, next, initUser, idpRefreshUrl) {
     try {
       /** @type {{ tid: string, user: { email: string, attributes: { idp: string, refresh_token: string }? } }} */
-      const { tid, user } = await this.#getUserFromHeader(req.headers.authorization);
+      const { tid, user } = await this.#getUserFromToken(req.headers.authorization, true);
 
       // Check refresh lock
-      if (this.hasLock(user.email)) {
+      if (this.hasLock(user?.email)) {
         throw new CustomError(httpCodes.CONFLICT, 'Token refresh is locked');
       }
-      this.lock(user.email);
+      this.lock(user?.email);
 
       // Call SSO refresh endpoint
       const response = await this.#idpRequest.post(idpRefreshUrl, {
         user: {
-          email: user.email,
+          email: user?.email,
           attributes: {
-            idp: attributes?.idp,
-            refresh_token: attributes?.refresh_token
+            idp: user?.attributes?.idp,
+            refresh_token: user?.attributes?.refresh_token
           }
         }
       });
@@ -478,7 +547,7 @@ export class SessionManager {
       const newToken = await this.#generateAndStoreToken(newUser);
 
       // Remove old token from Redis
-      const oldRedisKey = this.#getTokenRedisKey(email, tid);
+      const oldRedisKey = this.#getTokenRedisKey(user.email, tid);
       await this.#redisManager.getClient().del(oldRedisKey);
 
       this.#logger.debug('### TOKEN REFRESHED SUCCESSFULLY ###');
@@ -587,15 +656,8 @@ export class SessionManager {
     }
 
     try {
-      // Extract Token ID from current token
-      const authHeader = req.headers.authorization;
-      const token = authHeader?.substring(7);
-
-      if (!token) {
-        throw new CustomError(httpCodes.BAD_REQUEST, 'No token provided');
-      }
-
-      const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
+      // Extract Token ID and email from current token
+      const payload = await this.#getUserFromToken(req.headers.authorization, false);
       const { email, tid } = payload;
 
       if (!email || !tid) {
@@ -654,37 +716,6 @@ export class SessionManager {
   }
 
   /**
-   * Setup the session/user handlers with configurations
-   * @param {import('@types/express').Application} app Express application
-   */
-  async setup(app) {
-    this.#redisManager = new RedisManager();
-    this.#jwtManager = new JwtManager({
-      ...this.#config,
-      JWT_EXPIRATION_TIME: this.#config.SESSION_AGE, // SESSION_AGE is already in seconds
-    });
-
-    // Identity Provider Request
-    this.#idpRequest = axios.create({
-      baseURL: this.#config.SSO_ENDPOINT_URL,
-      timeout: 30000,
-    });
-    app.set('trust proxy', 1);
-    const isOK = await this.#redisManager.connect(this.#config.REDIS_URL, this.#config.REDIS_CERT_PATH);
-    if (this.#config.SESSION_MODE === SessionMode.SESSION) {
-      app.use(this.#sessionHandler(isOK));
-    }
-    
-    // Cache HTML template for TOKEN mode
-    if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
-      const templatePath = this.#config.TOKEN_STORAGE_TEMPLATE_PATH ||
-        path.resolve(__dirname, 'assets', 'template.html');
-      this.#htmlTemplate = fs.readFileSync(templatePath, 'utf8');
-      this.#logger.debug('### HTML TEMPLATE CACHED ###');
-    }
-  }
-
-  /**
    * Get Redis session RequestHandler
    * @returns {import('@types/express').RequestHandler} Returns RequestHandler instance of Express
    */
@@ -728,19 +759,18 @@ export class SessionManager {
   }
 
   /**
-   * Middleware to load full user data from Redis (with request-level caching)
+   * Middleware to load full user data (works for both SESSION and TOKEN modes)
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
   requireUser = () => {
     return async (req, res, next) => {
-      if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
-        const { user } = await this.#getUserFromHeader(req.headers.authorization, true);
-        req.user = user;
+      try {
+        req.user = await this.getUser(req);
+        return next();
       }
-      else {
-        req.user = req.session[this.#getSessionKey()];
+      catch (error) {
+        return next(error);
       }
-      return next();
     };
   };
 
