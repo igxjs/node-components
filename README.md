@@ -46,12 +46,18 @@ export const tokenSession = new SessionManager({
 });
 
 // Setup in your app
-await session.setup(app, (user) => ({ ...user, displayName: user.email }));
+await session.setup(app);
 
 // Protect routes - user data automatically loaded into req.user
 app.get('/protected', session.authenticate(), session.requireUser(), (req, res) => {
   res.json({ user: req.user });
 });
+
+// SSO callback with user transformation
+app.get('/auth/callback', session.callback((user) => ({
+  ...user,
+  displayName: user.email
+})));
 ```
 
 [📖 Full SessionManager Documentation](./docs/session-manager.md)
@@ -133,7 +139,7 @@ Uses traditional server-side session cookies. When a user authenticates via SSO,
 **Auth Methods:**
 - `session.authenticate()` - Protect routes with SSO session verification
 - `session.verifySession(isDebugging, redirectUrl)` - Explicit session verification method
-- `session.requireUser()` - Middleware to load user data into `req.user`
+- `session.requireUser()` - Middleware to load user data into `req.user` from session store
 - `session.logout(redirect?, all?)` - Logout current session (or logout all for token mode)
 
 ### TOKEN Mode
@@ -150,7 +156,7 @@ Uses JWT bearer tokens instead of session cookies. When a user authenticates via
 
 **Auth Methods:**
 - `session.verifyToken(isDebugging, redirectUrl)` - Protect routes with token verification
-- `session.requireUser()` - Middleware to load user data into `req.user` from Redis
+- `session.requireUser()` - Middleware to load user data into `req.user` from Redis using JWT token
 - `session.callback(initUser)` - SSO callback handler for token generation
 - `session.refresh(initUser)` - Refresh user authentication based on auth mode
 - `session.logout(redirect?, all?)` - Logout current token or all tokens for user
@@ -188,6 +194,9 @@ fetch('/api/protected', {
 | `SESSION_COOKIE_PATH` | string | `'/'` | Session cookie path |
 | `SESSION_SECRET` | string | - | Session/JWT secret key |
 | `SESSION_PREFIX` | string | `'ibmid:'` | Redis session/key prefix |
+| `SESSION_KEY` | string | `'session_token'` | Redis key for session data (SESSION mode) or localStorage key for token (TOKEN mode) |
+| `SESSION_EXPIRY_KEY` | string | `'session_expires_at'` | localStorage key for session expiry timestamp (TOKEN mode) |
+| `TOKEN_STORAGE_TEMPLATE_PATH` | string | - | Path to custom HTML template for TOKEN mode callback |
 | `REDIS_URL` | string | - | Redis connection URL (optional) |
 | `REDIS_CERT_PATH` | string | - | Path to Redis TLS certificate |
 | `JWT_ALGORITHM` | string | `'dir'` | JWT signing algorithm |

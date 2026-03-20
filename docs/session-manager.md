@@ -224,10 +224,7 @@ import { session } from './config/session-manager.js';
 const app = express();
 
 // Initialize session middleware
-await session.setup(app, (user) => ({
-  ...user,
-  displayName: user.email?.split('@')[0]
-}));
+await session.setup(app);
 
 // Protect routes with session authentication
 // requireUser() middleware loads user data into req.user
@@ -235,9 +232,10 @@ app.get('/protected', session.authenticate(), session.requireUser(), (req, res) 
   res.json({ user: req.user });
 });
 
-// SSO callback for session-based auth
+// SSO callback for session-based auth (with user transformation)
 app.get('/auth/callback', session.callback((user) => ({
   ...user,
+  displayName: user.email?.split('@')[0],
   loginTime: new Date()
 })));
 
@@ -288,10 +286,7 @@ import { session } from './config/session-manager.js';
 const app = express();
 
 // Initialize session middleware (still required for TOKEN mode)
-await session.setup(app, (user) => ({
-  ...user,
-  displayName: user.email?.split('@')[0]
-}));
+await session.setup(app);
 
 // Protect routes with token authentication
 // Client must send: Authorization: Bearer {token}
@@ -302,8 +297,10 @@ app.get('/api/protected', session.authenticate(), session.requireUser(), (req, r
 
 // SSO callback - generates token and returns HTML page
 // that stores token and expiry in localStorage, then redirects
+// User transformation happens in callback
 app.get('/auth/callback', session.callback((user) => ({
   ...user,
+  displayName: user.email?.split('@')[0],
   loginTime: new Date()
 })));
 
@@ -444,9 +441,9 @@ app.get('/api/profile',
 
 ### Core Methods
 
-- **`setup(app, updateUser)`** - Initialize session configurations and middleware
+- **`setup(app)`** - Initialize session configurations and middleware
   - `app`: Express application instance
-  - `updateUser`: Function to transform user object after authentication
+  - Note: User transformation is done in `callback()` and `refresh()` methods, not in `setup()`
 
 - **`authenticate(isDebugging?, redirectUrl?)`** - Protect routes based on configured SESSION_MODE
   - Uses `verifySession()` for SESSION mode
@@ -456,8 +453,8 @@ app.get('/api/profile',
 
 - **`requireUser()`** - Middleware to load full user data into `req.user`
   - SESSION mode: Loads user from session store
-  - TOKEN mode: Loads user from Redis using token
-  - Provides request-level caching
+  - TOKEN mode: Loads user from Redis using JWT token
+  - Provides request-level caching to avoid redundant lookups
   - Should be used after `authenticate()` middleware
   - **Example:**
     ```javascript

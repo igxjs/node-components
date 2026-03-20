@@ -142,24 +142,27 @@ export interface SessionConfig {
    */
   SESSION_SECRET?: string;
 
-  /** 
+  /**
    * Redis key prefix for storing session data
    * @example 'myapp:session:' (will result in keys like 'myapp:session:user@example.com')
-   * @default 'sess:'
+   * @default 'ibmid:' (legacy default, consider changing for your use case)
    */
   SESSION_PREFIX?: string;
 
-  /** 
+  /**
    * Redis key name for storing session data
+   * - In SESSION mode: key used to store the user in the session
+   * - In TOKEN mode: key of localStorage where the token is stored
    * @example 'user' (results in session.user containing user data)
-   * @default 'user'
+   * @default 'session_token'
    */
   SESSION_KEY?: string;
 
-  /** 
+  /**
    * Redis key name for storing session expiry timestamp
+   * - In TOKEN mode: key of localStorage where the session expiry timestamp is stored
    * @example 'expires' (results in session.expires containing expiry time)
-   * @default 'expires'
+   * @default 'session_expires_at'
    */
   SESSION_EXPIRY_KEY?: string;
 
@@ -311,15 +314,30 @@ export class SessionManager {
   redisManager(): RedisManager;
 
   /**
-   * Initialize the session configurations
+   * Initialize the session configurations and middleware
    * @param app Express application
-   * @param config Session configurations
-   * @param updateUser Process user object to compute attributes like permissions, avatar URL, etc.
    */
-  setup(
-    app: Application,
-    updateUser: (user: SessionUser | undefined) => any
-  ): Promise<void>;
+  setup(app: Application): Promise<void>;
+
+  /**
+   * Middleware to load full user data into req.user
+   * - SESSION mode: Loads user from session store
+   * - TOKEN mode: Loads user from Redis using JWT token
+   * - Provides request-level caching to avoid redundant lookups
+   * - Should be used after authenticate() middleware
+   * @returns Returns express Request Handler
+   * @example
+   * ```javascript
+   * app.get('/api/profile',
+   *   session.authenticate(),
+   *   session.requireUser(),
+   *   (req, res) => {
+   *     res.json({ user: req.user });
+   *   }
+   * );
+   * ```
+   */
+  requireUser(): RequestHandler;
 
   /**
    * Resource protection middleware based on configured SESSION_MODE

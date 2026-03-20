@@ -656,7 +656,6 @@ export class SessionManager {
   /**
    * Setup the session/user handlers with configurations
    * @param {import('@types/express').Application} app Express application
-   * @param {(user: object) => object} updateUser Update user function
    */
   async setup(app) {
     this.#redisManager = new RedisManager();
