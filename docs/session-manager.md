@@ -577,7 +577,7 @@ app.get('/api/profile',
 
 1. User clicks "Login" → Redirected to SSO provider
 2. SSO authenticates user → Redirects to `/auth/callback?jwt=...`
-3. `session.callback()` decrypts JWT → Generates JWT token → Stores in Redis under key pattern: `{SESSION_KEY}:t:{email}:{tid}`
+3. `session.callback()` decrypts JWT → Generates JWT token → Stores in Redis under key pattern: `{SESSION_KEY}:{email}:{tid}`
 4. Returns HTML page that saves token to localStorage under `SESSION_KEY` (default: 'session_token') and expiry timestamp under `SESSION_EXPIRY_KEY` (default: 'session_expires_at') → Redirects to success URL
 5. Client includes token in `Authorization: Bearer {token}` header
 6. Protected routes verify token → Access user via `req.user`
@@ -590,12 +590,12 @@ In TOKEN mode, two types of data are stored in Redis:
 ### 1. User Data (TTL based on SESSION_AGE)
 
 ```
-Key Pattern: {SESSION_PREFIX}{SESSION_KEY}:t:{email}:{tid}
+Key Pattern: {SESSION_PREFIX}{SESSION_KEY}:{email}:{tid}
 Value: JSON.stringify(user)
 TTL: SESSION_AGE / 1000 seconds
 
 Example (default SESSION_KEY='session_token', SESSION_PREFIX='ibmid:'):
-Key: ibmid:session_token:t:user@example.com:550e8400-e29b-41d4-a716-934b00000001
+Key: ibmid:session_token:user@example.com:550e8400-e29b-41d4-a716-934b00000001
 Value: {"email":"user@example.com","name":"John Doe","authorized":true}
 TTL: 64800 seconds (18 hours)
 ```
@@ -652,7 +652,7 @@ In **SESSION Mode**:
 
 In **TOKEN Mode**:
 - Acts as the LocalStorage key name where client stores the JWT token
-- Acts as the prefix for Redis token storage keys (key pattern: `{SESSION_KEY}:t:{email}:{tid}`)
+- Acts as the prefix for Redis token storage keys (key pattern: `{SESSION_KEY}:{email}:{tid}`)
 - Default value is `'session_token'`, so localStorage stores token at `localStorage['session_token']`
 
 ### SESSION_EXPIRY_KEY
@@ -705,7 +705,7 @@ if (new Date(expiresAt) < new Date()) {
 
 **Data Storage:**
 - JWT tokens encrypted with `SESSION_SECRET` and stored in Redis
-- Token key pattern: `{SESSION_KEY}:t:{email}:{tid}` (default: `session_token:t:*`)
+- Token key pattern: `{SESSION_KEY}:{email}:{tid}` (default: `session_token:*`)
 - Each token has unique ID (`tid`) for multi-device support
 - User data stored in Redis using same key prefix
 - Expiry timestamp stored in client's localStorage (not Redis)

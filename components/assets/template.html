@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <title>Sign in IBM Garage</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no,viewport-fit=cover,minimum-scale=1,maximum-scale=1,user-scalable=no">
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no,viewport-fit=cover,minimum-scale=1,maximum-scale=2">
     <meta name="robots" content="noindex, nofollow" />
     <style>
       :root {
@@ -94,9 +94,14 @@
         localStorage.setItem('{{SESSION_EXPIRY_KEY}}', '{{SESSION_EXPIRY_VALUE}}');
       }
 
+      /**
+       * Note: You can also request full user informlation by using ajax request or loading server side page.
+       */
+
       // Fall back to simple navigation
       location.href = '{{SSO_SUCCESS_URL}}';
-    } catch (e) {
+    }
+    catch (e) {
       console.error('Redirect failed:', e);
       success = false;
     }

@@ -1,6 +1,6 @@
 {
   "name": "@igxjs/node-components",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Node components for igxjs",
   "main": "index.js",
   "type": "module",
@@ -43,7 +43,7 @@
     "axios": "^1.13.6",
     "connect-redis": "^9.0.0",
     "express-session": "^1.19.0",
-    "jose": "^6.2.1",
+    "jose": "^6.2.2",
     "memorystore": "^1.6.7"
   },
   "devDependencies": {

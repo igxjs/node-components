@@ -272,7 +272,7 @@ export class SessionManager {
    * @private
    */
   #getTokenRedisKey(email, tid) {
-    return `${this.#config.SESSION_KEY}:t:${email}:${tid}`;
+    return `${this.#config.SESSION_KEY}:${email}:${tid}`;
   }
 
   /**
@@ -282,7 +282,7 @@ export class SessionManager {
    * @private
    */
   #getTokenRedisPattern(email) {
-    return `${this.#config.SESSION_KEY}:t:${email}:*`;
+    return `${this.#config.SESSION_KEY}:${email}:*`;
   }
 
   /**
@@ -325,26 +325,36 @@ export class SessionManager {
   }
 
   /**
+   * Generate lightweight JWT token
+   * @param {string} email User email
+   * @param {string} tokenId Token ID
+   * @param {number} expirationTime Expiration time in seconds
+   * @returns {Promise<string>} Returns the generated JWT token
+   * @private
+   */
+  async #getLightweightToken(email, tokenId, expirationTime) {
+    return await this.#jwtManager.encrypt({ email, tid: tokenId }, this.#config.SESSION_SECRET, { expirationTime });
+  }
+
+  /**
    * Generate and store JWT token in Redis
    * - JWT payload contains only { email, tid } for minimal size
    * - Full user data is stored in Redis as single source of truth
-   * @param {object} user User object with email and attributes
+   * @param {string} tid Token ID
+   * @param {Record<string, any> & { email: string, tid: string }} user User object with email and attributes
    * @returns {Promise<string>} Returns the generated JWT token
    * @throws {Error} If JWT encryption fails
    * @throws {Error} If Redis storage fails
    * @private
    * @example
-   * const token = await this.#generateAndStoreToken({
+   * const token = await this.#generateAndStoreToken('tid', {
    *   email: 'user@example.com',
    *   attributes: { /* user data * / }
    * });
    */
-  async #generateAndStoreToken(user) {
-    // Generate unique token ID for this device/session
-    const tid = crypto.randomUUID();
-    // Create JWT token with only email and tid (minimal payload)
-    const payload = { email: user.email, tid };
-    const token = await this.#jwtManager.encrypt(payload, this.#config.SESSION_SECRET, { expirationTime: this.#config.SESSION_AGE });
+  async #generateAndStoreToken(tid, user) {
+    // Create JWT token with only email, tid and idp (minimal payload)
+    const token = await this.#getLightweightToken(user.email, tid, this.#config.SESSION_AGE);
 
     // Store user data in Redis with TTL
     const redisKey = this.#getTokenRedisKey(user.email, tid);
@@ -357,20 +367,20 @@ export class SessionManager {
   /**
    * Extract and validate user data from Authorization header (TOKEN mode only)
    * @param {string} authHeader Authorization header in format "Bearer {token}"
-   * @param {boolean} [fetchFromRedis=true] Whether to fetch full user data from Redis
-   *   - true: Returns { tid, user } with full user data from Redis (default)
+   * @param {boolean} [includeUserData=true] Whether to include full user data in response
+   *   - true: Returns { tid, user } with full user data (default)
    *   - false: Returns JWT payload only (lightweight validation)
    * @returns {Promise<{ tid: string?, email: string?, user: object? } | object>}
-   *   - When fetchFromRedis=true: { tid: string, user: object }
-   *   - When fetchFromRedis=false: JWT payload object
+   *   - When includeUserData=true: { tid: string, user: object }
+   *   - When includeUserData=false: JWT payload object
    * @throws {CustomError} UNAUTHORIZED (401) if:
    *   - Authorization header is missing or invalid format
    *   - Token decryption fails
    *   - Token payload is invalid (missing email/tid)
-   *   - Token not found in Redis (when fetchFromRedis=true)
+   *   - Token not found in Redis (when includeUserData=true)
    * @private
    */
-  async #getUserFromToken(authHeader, fetchFromRedis = true) {
+  async #getUserFromToken(authHeader, includeUserData = true) {
     if (!authHeader?.startsWith('Bearer ')) {
       throw new CustomError(httpCodes.UNAUTHORIZED, 'Missing or invalid authorization header');
     }
@@ -378,7 +388,7 @@ export class SessionManager {
     // Decrypt JWT token
     const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
 
-    if (fetchFromRedis) {
+    if (includeUserData) {
       /** @type {{ email: string, tid: string }} Extract email and token ID */
       const { email, tid } = payload;
       if (!email || !tid) {
@@ -400,6 +410,7 @@ export class SessionManager {
   /**
    * Get authenticated user data (works for both SESSION and TOKEN modes)
    * @param {import('@types/express').Request} req Express request object
+   * @param {boolean} [includeUserData=true] Whether to include full user data in response
    * @returns {Promise<object>} Full user data object
    * @throws {CustomError} If user is not authenticated
    * @public
@@ -415,9 +426,9 @@ export class SessionManager {
    *   }
    * });
    */
-  async getUser(req) {
+  async getUser(req, includeUserData = false) {
     if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
-      const { user } = await this.#getUserFromToken(req.headers.authorization, true);
+      const { user } = await this.#getUserFromToken(req.headers.authorization, includeUserData);
       return user;
     }
     // Session mode
@@ -484,7 +495,7 @@ export class SessionManager {
    * @param {import('@types/express').Request} req Request with Authorization header
    * @param {import('@types/express').Response} res Response object
    * @param {import('@types/express').NextFunction} next Next middleware function
-   * @param {(user: object) => object} initUser Function to initialize/transform user object
+   * @param {(user: object) => object & { email: string }} initUser Function to initialize/transform user object
    * @param {string} idpRefreshUrl Identity provider refresh endpoint URL
    * @throws {CustomError} If refresh lock is active or SSO refresh fails
    * @private
@@ -505,12 +516,11 @@ export class SessionManager {
 
       // Call SSO refresh endpoint
       const response = await this.#idpRequest.post(idpRefreshUrl, {
-        user: {
-          email: user?.email,
-          attributes: {
-            idp: user?.attributes?.idp,
-            refresh_token: user?.attributes?.refresh_token
-          }
+        idp: user?.attributes?.idp, 
+        refresh_token: user?.attributes?.refresh_token
+      }, {
+        headers: {
+          Authorization: req.headers.authorization
         }
       });
 
@@ -530,11 +540,7 @@ export class SessionManager {
       const newUser = initUser(newPayload.user);
 
       // Generate new token
-      const newToken = await this.#generateAndStoreToken(newUser);
-
-      // Remove old token from Redis
-      const oldRedisKey = this.#getTokenRedisKey(user.email, tid);
-      await this.#redisManager.getClient().del(oldRedisKey);
+      const newToken = await this.#generateAndStoreToken(tid, newUser);
 
       this.#logger.debug('### TOKEN REFRESHED SUCCESSFULLY ###');
 
@@ -557,23 +563,30 @@ export class SessionManager {
   async #refreshSession(req, res, next, initUser, idpRefreshUrl) {
     try {
       const { email, attributes } = req.user || { email: '', attributes: {} };
+      // Check refresh lock
       if (this.hasLock(email)) {
-        throw new CustomError(httpCodes.CONFLICT, 'User refresh is locked');
+        throw new CustomError(httpCodes.CONFLICT, 'Session refresh is locked');
       }
       this.lock(email);
+
+      /** @type {string} */
+      const token = await this.#getLightweightToken(email, req.sessionID, req.user.attributes.expires_at);
+
+      // Call SSO refresh endpoint
       const response = await this.#idpRequest.post(idpRefreshUrl, {
-        user: {
-          email,
-          attributes: {
-            idp: attributes?.idp,
-            refresh_token: attributes?.refresh_token
-          }
+        idp: attributes?.idp,
+        refresh_token: attributes?.refresh_token,
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
       });
       if (response.status === httpCodes.OK) {
+        /** @type {{ jwt: string }} */
         const { jwt } = response.data;
-        const payload = await this.#saveSession(req, jwt, initUser);
-        return res.json(payload);
+        const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
+        const result = await this.#saveSession(req, payload, initUser);
+        return res.json(result);
       }
       throw new CustomError(response.status, response.statusText);
     } catch (error) {
@@ -819,13 +832,11 @@ export class SessionManager {
   /**
    * Save session
    * @param {import('@types/express').Request} request Request object
-   * @param {string} jwt JWT
+   * @param {import('jose').JWTPayload} payload JWT
    * @param {(user: object) => object} initUser Redirect URL
    * @returns {Promise<{ user: import('../models/types/user').UserModel, redirect_url: string }>} Promise
    */
-  #saveSession = async (request, jwt, initUser) => {
-    /** @type {{ payload: { user: import('../models/types/user').UserModel, redirect_url: string } }} */
-    const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
+  #saveSession = async (request, payload, initUser) => {
     if (payload?.user) {
       this.#logger.debug('### CALLBACK USER ###');
       request.session[this.#getSessionKey()] = initUser(payload.user);
@@ -876,26 +887,28 @@ export class SessionManager {
         try {
           // Decrypt JWT from Identity Adapter
           const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
-          
+
           if (!payload?.user) {
             throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
           }
   
-          /** @type {import('../index.js').SessionUser} */
-          const user = initUser(payload.user);
           /** @type {string} */
           const callbackRedirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
   
           // Token mode: Generate token and return HTML page
           if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
-            const token = await this.#generateAndStoreToken(user);
+            /** @type {import('../index.js').SessionUser} */
+            const user = initUser(payload.user);
+            // Generate unique token ID for this device/session
+            const tid = crypto.randomUUID();
+            const token = await this.#generateAndStoreToken(tid, user);
             this.#logger.debug('### CALLBACK TOKEN GENERATED ###');
             const html = this.#renderTokenStorageHtml(token, user.attributes.expires_at, callbackRedirectUrl);
             return res.send(html);
           }
 
           // Session mode: Save to session and redirect
-          await this.#saveSession(req, jwt, initUser);
+          await this.#saveSession(req, payload, initUser);
           return res.redirect(callbackRedirectUrl);
         }
         catch (error) {
@@ -943,7 +956,8 @@ export class SessionManager {
 
       if (mode === SessionMode.TOKEN) {
         return this.#refreshToken(req, res, next, initUser, idpRefreshUrl);
-      } else {
+      }
+      else {
         return this.#refreshSession(req, res, next, initUser, idpRefreshUrl);
       }
     };

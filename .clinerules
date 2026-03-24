@@ -9,7 +9,7 @@
     "style": "custom-node-components",
     "moduleSystem": "esm",
     "namingConventions": {
-      "constructorOptions": "SCREAMING_SNAKE_CASE",
+      "constructorOptions": "camelCase",
       "methodParameters": "camelCase",
       "classes": "PascalCase",
       "methods": "camelCase",
