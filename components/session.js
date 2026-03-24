@@ -370,7 +370,7 @@ export class SessionManager {
    * @param {boolean} [includeUserData=true] Whether to include full user data in response
    *   - true: Returns { tid, user } with full user data (default)
    *   - false: Returns JWT payload only (lightweight validation)
-   * @returns {Promise<{ user: { email: string, tid: string } } & object>}
+   * @returns {Promise<{ tid: string, user: { email: string, attributes: { expires_at: number, sub: string } } } & object>}
    *   - When includeUserData=true: { tid: string, user: object }
    *   - When includeUserData=false: JWT payload object
    * @throws {CustomError} UNAUTHORIZED (401) if:
@@ -385,7 +385,7 @@ export class SessionManager {
       throw new CustomError(httpCodes.UNAUTHORIZED, 'Missing or invalid authorization header');
     }
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    // Decrypt JWT token
+    /** @type {{ payload: { email: string, tid: string } & import('jose').JWTPayload }} */
     const { payload } = await this.#jwtManager.decrypt(token, this.#config.SSO_CLIENT_SECRET);
 
     if (includeUserData) {
@@ -402,9 +402,9 @@ export class SessionManager {
       if (!userData) {
         throw new CustomError(httpCodes.UNAUTHORIZED, 'Token not found or expired');
       }
-      return { user: { ...JSON.parse(userData), tid } };
+      return { tid, user: { ...JSON.parse(userData) } };
     }
-    return { user: payload };
+    return { tid: payload.tid, user: { email: payload.email, attributes: { sub: payload.sub, expires_at: payload.exp ? payload.exp * 1000 : 0 } } };
   }
 
   /**
@@ -505,7 +505,7 @@ export class SessionManager {
    */
   async #refreshToken(req, res, next, initUser, idpRefreshUrl) {
     try {
-      const { user } = await this.#getUserFromToken(req.headers.authorization, true);
+      const { tid, user } = await this.#getUserFromToken(req.headers.authorization, true);
 
       // Check refresh lock
       if (this.hasLock(user?.email)) {
@@ -539,7 +539,7 @@ export class SessionManager {
       const newUser = initUser(newPayload.user);
 
       // Generate new token
-      const newToken = await this.#generateAndStoreToken(user.tid, newUser);
+      const newToken = await this.#generateAndStoreToken(tid, newUser);
 
       this.#logger.debug('### TOKEN REFRESHED SUCCESSFULLY ###');
 
@@ -655,8 +655,8 @@ export class SessionManager {
 
     try {
       // Extract Token ID and email from current token
-      const { user } = await this.#getUserFromToken(req.headers.authorization, false);
-      const { email, tid } = user;
+      const { tid, user } = await this.#getUserFromToken(req.headers.authorization, false);
+      const { email } = user;
 
       if (!email || !tid) {
         throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid token payload');
