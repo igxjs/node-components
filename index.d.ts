@@ -316,6 +316,7 @@ export class SessionManager {
   /**
    * Get authenticated user data (works for both SESSION and TOKEN modes)
    * @param req Express request object
+   * @param includeUserData Include user data in the response (default: false)
    * @returns Promise resolving to full user data object
    * @throws CustomError If user is not authenticated
    * @example
@@ -323,7 +324,7 @@ export class SessionManager {
    * // Use in custom middleware
    * app.use(async (req, res, next) => {
    *   try {
-   *     const user = await sessionManager.getUser(req);
+   *     const user = await sessionManager.getUser(req, true);
    *     req.customUser = user;
    *     next();
    *   } catch (error) {
@@ -332,7 +333,7 @@ export class SessionManager {
    * });
    * ```
    */
-  getUser(req: Request): Promise<SessionUser>;
+  getUser(req: Request, includeUserData: boolean?): Promise<SessionUser>;
 
   /**
    * Initialize the session configurations and middleware

@@ -410,7 +410,7 @@ export class SessionManager {
   /**
    * Get authenticated user data (works for both SESSION and TOKEN modes)
    * @param {import('@types/express').Request} req Express request object
-   * @param {boolean} [includeUserData=true] Whether to include full user data in response
+   * @param {boolean} [includeUserData=false] Whether to include full user data in response
    * @returns {Promise<object>} Full user data object
    * @throws {CustomError} If user is not authenticated
    * @public
@@ -762,9 +762,9 @@ export class SessionManager {
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
   requireUser = () => {
-    return async (req, res, next) => {
+    return async (req, _res, next) => {
       try {
-        req.user = await this.getUser(req);
+        req.user = await this.getUser(req, true);
         return next();
       }
       catch (error) {
