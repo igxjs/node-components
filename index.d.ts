@@ -440,6 +440,12 @@ export class SessionManager {
    * @returns Returns express Request Handler
    */
   logout(): RequestHandler;
+
+  /**
+   * Get the current session mode
+   * @returns Returns 'session' or 'token' based on configuration
+   */
+  getSessionMode(): string;
 }
 
 // Custom Error class

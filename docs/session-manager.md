@@ -23,6 +23,17 @@ JWT bearer tokens stored in Redis. When a user authenticates via SSO, a JWT toke
 - APIs requiring stateless authentication
 - Multi-device sessions (each device gets its own token)
 
+## SessionMode Constants
+
+SessionManager provides constants to identify the authentication mode:
+
+```javascript
+import { SessionMode } from '@igxjs/node-components';
+
+console.log(SessionMode.SESSION); // 'session'
+console.log(SessionMode.TOKEN);    // 'token'
+```
+
 ## Configuration Options
 
 ```javascript
@@ -561,6 +572,18 @@ app.get('/api/profile',
 
 - **`clearLocks()`** - Clear expired session refresh locks
   - Called automatically by `lock()` - Can be called manually for cleanup
+
+- **`getSessionMode()`** - Get the current session mode
+  - Returns: `SessionMode.SESSION` (`'session'`) or `SessionMode.TOKEN` (`'token'`) based on configuration
+  - Useful for conditional logic based on authentication mode
+  - **Example:**
+    ```javascript
+    import { SessionMode } from '@igxjs/node-components';
+
+    if (session.getSessionMode() === SessionMode.TOKEN) {
+      // Handle token-specific logic
+    }
+    ```
 
 ## Authentication Flow Comparison
 

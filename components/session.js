@@ -311,12 +311,12 @@ export class SessionManager {
     });
     app.set('trust proxy', 1);
     const isOK = await this.#redisManager.connect(this.#config.REDIS_URL, this.#config.REDIS_CERT_PATH);
-    if (this.#config.SESSION_MODE === SessionMode.SESSION) {
+    if (this.getSessionMode() === SessionMode.SESSION) {
       app.use(this.#sessionHandler(isOK));
     }
 
     // Cache HTML template for TOKEN mode
-    if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+    if (this.getSessionMode() === SessionMode.TOKEN) {
       const templatePath = this.#config.TOKEN_STORAGE_TEMPLATE_PATH ||
         path.resolve(__dirname, 'assets', 'template.html');
       this.#htmlTemplate = fs.readFileSync(templatePath, 'utf8');
@@ -427,7 +427,7 @@ export class SessionManager {
    * });
    */
   async getUser(req, includeUserData = false) {
-    if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+    if (this.getSessionMode() === SessionMode.TOKEN) {
       const { user } = await this.#getUserFromToken(req.headers.authorization, includeUserData);
       return user;
     }
@@ -501,7 +501,7 @@ export class SessionManager {
    * @private
    * @example
    * // Response format:
-   * // { jwt: "new_jwt", user: {...}, expires_at: 64800, token_type: "Bearer" }
+   * // { jwt: "new_jwt", user: {...} }
    */
   async #refreshToken(req, res, next, initUser, idpRefreshUrl) {
     try {
@@ -544,7 +544,7 @@ export class SessionManager {
       this.#logger.debug('### TOKEN REFRESHED SUCCESSFULLY ###');
 
       // Return new token
-      return res.json({ jwt: newToken, user: newUser, expires_at: this.#config.SESSION_AGE, token_type: 'Bearer' });
+      return res.json({ jwt: newToken, user: newUser });
     } catch (error) {
       return next(httpHelper.handleAxiosError(error));
     }
@@ -798,7 +798,7 @@ export class SessionManager {
    */
   authenticate(errorRedirectUrl = '') {
     return async (req, res, next) => {
-      const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
+      const mode = this.getSessionMode() || SessionMode.SESSION;
       if (mode === SessionMode.TOKEN) {
         return this.#verifyToken(req, res, next, errorRedirectUrl);
       }
@@ -895,7 +895,7 @@ export class SessionManager {
           const callbackRedirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
   
           // Token mode: Generate token and return HTML page
-          if (this.#config.SESSION_MODE === SessionMode.TOKEN) {
+          if (this.getSessionMode() === SessionMode.TOKEN) {
             /** @type {import('../index.js').SessionUser} */
             const user = initUser(payload.user);
             // Generate unique token ID for this device/session
@@ -951,7 +951,7 @@ export class SessionManager {
   refresh(initUser) {
     const idpRefreshUrl = '/auth/refresh'.concat('?client_id=').concat(this.#config.SSO_CLIENT_ID);
     return async (req, res, next) => {
-      const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
+      const mode = this.getSessionMode() || SessionMode.SESSION;
 
       if (mode === SessionMode.TOKEN) {
         return this.#refreshToken(req, res, next, initUser, idpRefreshUrl);
@@ -971,8 +971,8 @@ export class SessionManager {
       const { redirect = false, all = false } = req.query;
       const isRedirect = (redirect === 'true' || redirect === true);
       const logoutAll = (all === 'true' || all === true);
-      const mode = this.#config.SESSION_MODE || SessionMode.SESSION;
-      
+      const mode = this.getSessionMode() || SessionMode.SESSION;
+
       if (mode === SessionMode.TOKEN) {
         return this.#logoutToken(req, res, isRedirect, logoutAll);
       }
@@ -998,4 +998,11 @@ export class SessionManager {
     };
   }
 
+  /**
+   * Get session mode
+   * @returns {string} Session mode
+   */
+  getSessionMode() {
+    return this.#config.SESSION_MODE;
+  }
 }
