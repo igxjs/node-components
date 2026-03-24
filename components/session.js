@@ -333,7 +333,7 @@ export class SessionManager {
    * @private
    */
   async #getLightweightToken(email, tokenId, expirationTime) {
-    return await this.#jwtManager.encrypt({ email, tid: tokenId }, this.#config.SESSION_SECRET, { expirationTime });
+    return await this.#jwtManager.encrypt({ email, tid: tokenId }, this.#config.SSO_CLIENT_SECRET, { expirationTime });
   }
 
   /**
@@ -386,7 +386,7 @@ export class SessionManager {
     }
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     // Decrypt JWT token
-    const { payload } = await this.#jwtManager.decrypt(token, this.#config.SESSION_SECRET);
+    const { payload } = await this.#jwtManager.decrypt(token, this.#config.SSO_CLIENT_SECRET);
 
     if (includeUserData) {
       /** @type {{ email: string, tid: string }} Extract email and token ID */
