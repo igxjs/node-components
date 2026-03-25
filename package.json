@@ -12,21 +12,7 @@
     "url": "git+https://github.com/igxjs/node-components.git"
   },
   "keywords": [
-    "igxjs",
-    "express",
-    "session-management",
-    "jwt",
-    "jwe",
-    "redis",
-    "authentication",
-    "sso",
-    "oauth",
-    "middleware",
-    "node-components",
-    "session",
-    "token-auth",
-    "bearer-token",
-    "express-middleware"
+    "igxjs"
   ],
   "author": "Michael",
   "license": "Apache-2.0",
