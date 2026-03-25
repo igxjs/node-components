@@ -141,26 +141,33 @@ export class SessionManager {
   #htmlTemplate = null;
 
   /**
-   * Create a new session manager
-   * @param {SessionConfig} config Session configuration
-   * @throws {TypeError} If config is not an object
-   * @throws {Error} If required configuration fields are missing
+   * Validate config is an object
+   * @param {SessionConfig} config
+   * @throws {TypeError}
    */
-  constructor(config) {
-    // Validate config is an object
+  #validateConfigType(config) {
     if (!config || typeof config !== 'object') {
       throw new TypeError('SessionManager configuration must be an object');
     }
+  }
 
-    // Validate required fields based on SESSION_MODE
-    const mode = config.SESSION_MODE || SessionMode.SESSION;
-
-    // SESSION_SECRET is always required for both modes
+  /**
+   * Validate required configuration fields
+   * @param {SessionConfig} config
+   * @throws {Error}
+   */
+  #validateRequiredFields(config) {
     if (!config.SESSION_SECRET) {
       throw new Error('SESSION_SECRET is required for SessionManager');
     }
+  }
 
-    // Validate SSO configuration if SSO endpoints are used
+  /**
+   * Validate SSO configuration
+   * @param {SessionConfig} config
+   * @throws {Error}
+   */
+  #validateSsoConfig(config) {
     if (config.SSO_ENDPOINT_URL) {
       if (!config.SSO_CLIENT_ID) {
         throw new Error('SSO_CLIENT_ID is required when SSO_ENDPOINT_URL is provided');
@@ -169,9 +176,15 @@ export class SessionManager {
         throw new Error('SSO_CLIENT_SECRET is required when SSO_ENDPOINT_URL is provided');
       }
     }
+  }
 
-    // Validate TOKEN mode specific requirements
-    if (mode === SessionMode.TOKEN) {
+  /**
+   * Validate TOKEN mode requirements
+   * @param {SessionConfig} config
+   * @throws {Error}
+   */
+  #validateTokenMode(config) {
+    if (config.SESSION_MODE === SessionMode.TOKEN) {
       if (!config.SSO_SUCCESS_URL) {
         throw new Error('SSO_SUCCESS_URL is required for TOKEN authentication mode');
       }
@@ -179,11 +192,16 @@ export class SessionManager {
         throw new Error('SSO_FAILURE_URL is required for TOKEN authentication mode');
       }
     }
+  }
 
-    this.#config = {
-      // Session Mode
+  /**
+   * Build configuration object
+   * @param {SessionConfig} config
+   * @returns {object}
+   */
+  #buildConfig(config) {
+    return {
       SESSION_MODE: config.SESSION_MODE || SessionMode.SESSION,
-      // Session - SESSION_AGE is now in seconds (default: 64800 = 18 hours)
       SESSION_AGE: config.SESSION_AGE || 64800,
       SESSION_COOKIE_PATH: config.SESSION_COOKIE_PATH || '/',
       SESSION_SECRET: config.SESSION_SECRET,
@@ -191,18 +209,13 @@ export class SessionManager {
       SESSION_KEY: config.SESSION_KEY || 'session_token',
       SESSION_EXPIRY_KEY: config.SESSION_EXPIRY_KEY || 'session_expires_at',
       TOKEN_STORAGE_TEMPLATE_PATH: config.TOKEN_STORAGE_TEMPLATE_PATH,
-
-      // Identity Provider
       SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
       SSO_CLIENT_ID: config.SSO_CLIENT_ID,
       SSO_CLIENT_SECRET: config.SSO_CLIENT_SECRET,
       SSO_SUCCESS_URL: config.SSO_SUCCESS_URL,
       SSO_FAILURE_URL: config.SSO_FAILURE_URL,
-      // Redis
       REDIS_URL: config.REDIS_URL,
       REDIS_CERT_PATH: config.REDIS_CERT_PATH,
-
-      // JWT Manager
       JWT_ALGORITHM: config.JWT_ALGORITHM || 'dir',
       JWT_ENCRYPTION: config.JWT_ENCRYPTION || 'A256GCM',
       JWT_CLOCK_TOLERANCE: config.JWT_CLOCK_TOLERANCE ?? 30,
@@ -211,6 +224,20 @@ export class SessionManager {
       JWT_AUDIENCE: config.JWT_AUDIENCE,
       JWT_SUBJECT: config.JWT_SUBJECT,
     };
+  }
+
+  /**
+   * Create a new session manager
+   * @param {SessionConfig} config Session configuration
+   * @throws {TypeError} If config is not an object
+   * @throws {Error} If required configuration fields are missing
+   */
+  constructor(config) {
+    this.#validateConfigType(config);
+    this.#validateRequiredFields(config);
+    this.#validateSsoConfig(config);
+    this.#validateTokenMode(config);
+    this.#config = this.#buildConfig(config);
   }
 
   /**
