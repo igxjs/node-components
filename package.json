@@ -7,7 +7,7 @@
   "scripts": {
     "test": "mocha tests/**/*.test.js --timeout 5000",
     "lint": "eslint .",
-    "lint:fix": "eslint ."
+    "lint:fix": "eslint . --fix"
   },
   "repository": {
     "type": "git",

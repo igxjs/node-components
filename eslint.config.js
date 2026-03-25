@@ -2,6 +2,9 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
+  {
+    ignores: ['tests/'],
+  },
   js.configs.recommended,
   {
     languageOptions: {
@@ -15,7 +18,7 @@ export default [
       },
     },
     rules: {
-      'no-unused-vars': 'warn',
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
       'no-console': 'off',
       'prefer-const': 'error',
       'no-var': 'error',
@@ -27,7 +30,6 @@ export default [
       'eol-last': 'warn',
       'no-trailing-spaces': 'warn',
       'no-param-reassign': ['error', { props: false }],
-      'max-len': ['warn', { code: 120, ignoreComments: true, ignoreStrings: true, ignoreTemplateLiterals: true }],
       'complexity': ['warn', 15],
       'max-lines-per-function': ['warn', { max: 100, skipBlankLines: true, skipComments: true }],
     },

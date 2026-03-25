@@ -2,20 +2,20 @@
  * Logger utility for node-components
  * Provides configurable logging with enable/disable functionality
  * Uses singleton pattern to manage logger instances per component
- * 
+ *
  * @example
  * import { Logger } from './logger.js';
- * 
+ *
  * // Recommended: Get logger instance (singleton pattern)
  * const logger = Logger.getInstance('ComponentName');
- * 
+ *
  * // With explicit enable/disable
  * const logger = Logger.getInstance('ComponentName', true);  // Always enabled
  * const logger = Logger.getInstance('ComponentName', false); // Always disabled
- * 
+ *
  * // Backward compatibility: Constructor still works
  * const logger = new Logger('ComponentName');
- * 
+ *
  * // Use logger
  * logger.info('Operation completed');
  * logger.error('Error occurred', error);
@@ -23,10 +23,10 @@
 export class Logger {
   /** @type {Map<string, Logger>} */
   static #instances = new Map();
-  
+
   /** @type {boolean} - Global flag to enable/disable colors */
   static #colorsEnabled = true;
-  
+
   /** ANSI color codes for different log levels */
   static #colors = {
     reset: '\x1b[0m',
@@ -35,7 +35,7 @@ export class Logger {
     yellow: '\x1b[33m',  // warn - yellow
     red: '\x1b[31m',     // error - red
   };
-  
+
   /** @type {boolean} */
   #enabled;
   /** @type {string} */
@@ -51,11 +51,11 @@ export class Logger {
    */
   static getInstance(componentName, enableLogging) {
     const key = `${componentName}:${enableLogging ?? 'default'}`;
-    
+
     if (!Logger.#instances.has(key)) {
       Logger.#instances.set(key, new Logger(componentName, enableLogging));
     }
-    
+
     return Logger.#instances.get(key);
   }
 
@@ -90,15 +90,15 @@ export class Logger {
     // Otherwise, default to enabled in development, disabled in production
     this.#enabled = enableLogging ?? (process.env.NODE_ENV !== 'production');
     this.#prefix = `[${componentName}]`;
-    
+
     // Determine if colors should be used:
     // - Colors are globally enabled
     // - Output is a terminal (TTY)
     // - NO_COLOR environment variable is not set
-    this.#useColors = Logger.#colorsEnabled && 
-                     process.stdout.isTTY && 
+    this.#useColors = Logger.#colorsEnabled &&
+                     process.stdout.isTTY &&
                      !process.env.NO_COLOR;
-    
+
     // Assign methods based on enabled flag to eliminate runtime checks
     // This improves performance by avoiding conditional checks on every log call
     if (this.#enabled) {

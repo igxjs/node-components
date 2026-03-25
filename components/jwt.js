@@ -9,31 +9,31 @@ import { jwtDecrypt, EncryptJWT } from 'jose';
 export class JwtManager {
   /** @type {string} JWE algorithm */
   algorithm;
-  
+
   /** @type {string} Encryption method */
   encryption;
-  
+
   /** @type {number} Token expiration time */
   expirationTime;
-  
+
   /** @type {number} Clock tolerance in seconds */
   clockTolerance;
-  
+
   /** @type {string} Hash algorithm for secret derivation */
   secretHashAlgorithm;
-  
+
   /** @type {string|null} Optional JWT issuer claim */
   issuer;
-  
+
   /** @type {string|null} Optional JWT audience claim */
   audience;
-  
+
   /** @type {string|null} Optional JWT subject claim */
   subject;
   /**
    * Create a new JwtManager instance with configurable defaults
    * Constructor options use UPPERCASE naming convention with JWT_ prefix (e.g., JWT_ALGORITHM).
-   * 
+   *
    * @typedef {Object} JwtManagerOptions JwtManager configuration options
    * @property {string} [JWT_ALGORITHM='dir'] JWE algorithm (default: 'dir')
    * @property {string} [JWT_ENCRYPTION='A256GCM'] Encryption method (default: 'A256GCM')
@@ -59,7 +59,7 @@ export class JwtManager {
 
   /**
    * Encrypt method options (camelCase naming convention, uses instance defaults when not provided)
-   * 
+   *
    * @typedef {Object} JwtEncryptOptions Encryption method options
    * @property {string} [algorithm='dir'] JWE algorithm (overrides instance JWT_ALGORITHM)
    * @property {string} [encryption='A256GCM'] Encryption method (overrides instance JWT_ENCRYPTION)
@@ -71,7 +71,7 @@ export class JwtManager {
    */
   /**
    * Generate JWT token for user session
-   * 
+   *
    * @param {import('jose').JWTPayload} data User data payload
    * @param {string} secret Secret key or password for encryption
    * @param {JwtEncryptOptions} [options] Per-call configuration overrides (camelCase naming convention)
@@ -113,7 +113,7 @@ export class JwtManager {
 
   /**
    * Decrypt method options (camelCase naming convention, uses instance defaults when not provided)
-   * 
+   *
    * @typedef {Object} JwtDecryptOptions Decryption method options
    * @property {number} [clockTolerance=30] Clock tolerance in seconds (overrides instance JWT_CLOCK_TOLERANCE)
    * @property {string} [secretHashAlgorithm='SHA-256'] Hash algorithm for secret derivation (overrides instance JWT_SECRET_HASH_ALGORITHM)
@@ -123,7 +123,7 @@ export class JwtManager {
    **/
   /**
    * Decrypt JWT
-   * 
+   *
    * @param {string} token JWT token to decrypt
    * @param {string} secret Secret key or password for decryption
    * @param {JwtDecryptOptions} [options] Per-call configuration overrides (camelCase naming convention)

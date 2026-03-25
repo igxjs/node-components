@@ -28,15 +28,15 @@ export const SessionMode = {
  * Session configuration options
  */
 export class SessionConfig {
-  /** 
+  /**
    * @type {string} Authentication mode for protected routes
    * - Supported values: SessionMode.SESSION | SessionMode.TOKEN
    * @default SessionMode.SESSION
    */
   SESSION_MODE;
-  /** 
+  /**
    * @type {string} Identity Provider microservice endpoint URL
-   * 
+   *
    * This is a fully customized, independent microservice that provides SSO authentication.
    * The endpoint serves multiple applications and provides the following APIs:
    * - GET /auth/providers - List supported identity providers
@@ -44,7 +44,7 @@ export class SessionConfig {
    * - POST /auth/verify - Verify JWT token validity
    * - GET /auth/callback/:idp - Validate authentication and return user data
    * - POST /auth/refresh - Refresh access tokens
-   * 
+   *
    * @example
    * SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1'
    */
@@ -67,19 +67,19 @@ export class SessionConfig {
   SESSION_COOKIE_PATH;
   /** @type {string} Session secret */
   SESSION_SECRET;
-  /** 
-   * @type {string} 
+  /**
+   * @type {string}
    * @default 'ibmid:'
    */
   SESSION_PREFIX;
-  /** 
+  /**
    * @type {string} Session key
    * - In the `SessionMode.SESSION` mode, this is the key used to store the user in the session.
    * - In the `SessionMode.TOKEN` mode, this is the key of localStorage where the user is stored.
    * @default 'session_token'
    */
   SESSION_KEY;
-  /** 
+  /**
    * @type {string} Session expiry key
    * - In the `SessionMode.TOKEN` mode, this is the key of localStorage where the session expiry timestamp is stored.
    * @default 'session_expires_at'
@@ -154,7 +154,7 @@ export class SessionManager {
 
     // Validate required fields based on SESSION_MODE
     const mode = config.SESSION_MODE || SessionMode.SESSION;
-    
+
     // SESSION_SECRET is always required for both modes
     if (!config.SESSION_SECRET) {
       throw new Error('SESSION_SECRET is required for SessionManager');
@@ -462,7 +462,7 @@ export class SessionManager {
         return next(new CustomError(httpCodes.UNAUTHORIZED, 'Token expired'));
       }
 
-      return next(error instanceof CustomError ? error : 
+      return next(error instanceof CustomError ? error :
         new CustomError(httpCodes.UNAUTHORIZED, 'Token verification failed'));
     }
   }
@@ -515,7 +515,7 @@ export class SessionManager {
 
       // Call SSO refresh endpoint
       const response = await this.#idpRequest.post(idpRefreshUrl, {
-        idp: user?.attributes?.idp, 
+        idp: user?.attributes?.idp,
         refresh_token: user?.attributes?.refresh_token
       }, {
         headers: {
@@ -622,7 +622,7 @@ export class SessionManager {
       if (isRedirect) {
         return res.redirect(this.#config.SSO_SUCCESS_URL);
       }
-      return res.json({ 
+      return res.json({
         message: 'All tokens logged out successfully',
         tokensRemoved: keys.length,
         redirect_url: this.#config.SSO_SUCCESS_URL
@@ -632,7 +632,7 @@ export class SessionManager {
       if (isRedirect) {
         return res.redirect(this.#config.SSO_FAILURE_URL);
       }
-      return res.status(httpCodes.SYSTEM_FAILURE).json({ 
+      return res.status(httpCodes.SYSTEM_FAILURE).json({
         error: 'Logout all failed',
         redirect_url: this.#config.SSO_FAILURE_URL
       });
@@ -671,7 +671,7 @@ export class SessionManager {
       if (isRedirect) {
         return res.redirect(this.#config.SSO_SUCCESS_URL);
       }
-      return res.json({ 
+      return res.json({
         message: 'Logout successful',
         redirect_url: this.#config.SSO_SUCCESS_URL
       });
@@ -681,7 +681,7 @@ export class SessionManager {
       if (isRedirect) {
         return res.redirect(this.#config.SSO_FAILURE_URL);
       }
-      return res.status(httpCodes.SYSTEM_FAILURE).json({ 
+      return res.status(httpCodes.SYSTEM_FAILURE).json({
         error: 'Logout failed',
         redirect_url: this.#config.SSO_FAILURE_URL
       });
@@ -776,9 +776,9 @@ export class SessionManager {
    * Resource protection based on configured SESSION_MODE
    * - SESSION mode: Verifies user exists in session store and is authorized (checks req.session data)
    * - TOKEN mode: Validates JWT token from Authorization header (lightweight validation)
-   * 
+   *
    * Note: This method verifies authentication only. Use requireUser() after this to populate req.user.
-   * 
+   *
    * @param {string} [errorRedirectUrl=''] Redirect URL on authentication failure
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    * @example
@@ -786,9 +786,9 @@ export class SessionManager {
    * app.get('/api/check', session.authenticate(), (req, res) => {
    *   res.json({ authenticated: true });
    * });
-   * 
+   *
    * // Option 2: Verify authentication AND load user data into req.user
-   * app.get('/api/profile', 
+   * app.get('/api/profile',
    *   session.authenticate(),   // Verifies session/token
    *   session.requireUser(),     // Loads user data into req.user
    *   (req, res) => {
@@ -852,7 +852,7 @@ export class SessionManager {
     }
     throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
     };
-  
+
     /**
      * Render HTML template for token storage
      * @param {string} token JWT token
@@ -870,7 +870,7 @@ export class SessionManager {
         .replaceAll('{{SSO_SUCCESS_URL}}', sucessRedirectUrl)
         .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
     }
-  
+
     /**
      * SSO callback for successful login
      * @param {(user: object) => object} initUser Initialize user object function
@@ -882,7 +882,7 @@ export class SessionManager {
         if (!jwt) {
           return next(new CustomError(httpCodes.BAD_REQUEST, 'Missing `jwt` in query parameters'));
         }
-  
+
         try {
           // Decrypt JWT from Identity Adapter
           const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
@@ -890,10 +890,10 @@ export class SessionManager {
           if (!payload?.user) {
             throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
           }
-  
+
           /** @type {string} */
           const callbackRedirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
-  
+
           // Token mode: Generate token and return HTML page
           if (this.getSessionMode() === SessionMode.TOKEN) {
             /** @type {import('../index.js').SessionUser} */
@@ -986,8 +986,8 @@ export class SessionManager {
           if (isRedirect) {
             return res.redirect(this.#config.SSO_FAILURE_URL);
           }
-          return res.status(httpCodes.AUTHORIZATION_FAILED).send({ 
-            redirect_url: this.#config.SSO_FAILURE_URL 
+          return res.status(httpCodes.AUTHORIZATION_FAILED).send({
+            redirect_url: this.#config.SSO_FAILURE_URL
           });
         }
         if (isRedirect) {
