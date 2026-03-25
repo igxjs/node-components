@@ -103,7 +103,7 @@ export class Logger {
     // This improves performance by avoiding conditional checks on every log call
     if (this.#enabled) {
       const colors = Logger.#colors;
-      
+
       if (this.#useColors) {
         // Logging enabled with colors: colorize the prefix
         this.debug = (...args) => console.debug(colors.dim + this.#prefix + colors.reset, ...args);
