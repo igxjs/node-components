@@ -161,12 +161,13 @@ export const httpHelper = {
    * @returns {string} Formatted string
    */
   format (str, ...args) {
+    let result = str;
     const matched = str.match(/{\d}/ig);
     matched.forEach((element, index) => {
       if(args.length > index)
-        str = str.replace(element, args[index]);
+        result = result.replace(element, args[index]);
     });
-    return str;
+    return result;
   },
 
   /**
