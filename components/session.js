@@ -52,7 +52,7 @@ export class SessionConfig {
   /** @type {string} */
   SSO_CLIENT_ID;
   /** @type {string} */
-  SSO_CLIENT_SECRET;
+  SSO_JWT_SECRET;
   /** @type {string} */
   SSO_SUCCESS_URL;
   /** @type {string} */
@@ -172,8 +172,8 @@ export class SessionManager {
       if (!config.SSO_CLIENT_ID) {
         throw new Error('SSO_CLIENT_ID is required when SSO_ENDPOINT_URL is provided');
       }
-      if (!config.SSO_CLIENT_SECRET) {
-        throw new Error('SSO_CLIENT_SECRET is required when SSO_ENDPOINT_URL is provided');
+      if (!config.SSO_JWT_SECRET) {
+        throw new Error('SSO_JWT_SECRET is required when SSO_ENDPOINT_URL is provided');
       }
     }
   }
@@ -211,7 +211,7 @@ export class SessionManager {
       TOKEN_STORAGE_TEMPLATE_PATH: config.TOKEN_STORAGE_TEMPLATE_PATH,
       SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
       SSO_CLIENT_ID: config.SSO_CLIENT_ID,
-      SSO_CLIENT_SECRET: config.SSO_CLIENT_SECRET,
+      SSO_JWT_SECRET: config.SSO_JWT_SECRET,
       SSO_SUCCESS_URL: config.SSO_SUCCESS_URL,
       SSO_FAILURE_URL: config.SSO_FAILURE_URL,
       REDIS_URL: config.REDIS_URL,
@@ -360,7 +360,7 @@ export class SessionManager {
    * @private
    */
   async #getLightweightToken(email, tokenId, expirationTime) {
-    return await this.#jwtManager.encrypt({ email, tid: tokenId }, this.#config.SSO_CLIENT_SECRET, { expirationTime });
+    return await this.#jwtManager.encrypt({ email, tid: tokenId }, this.#config.SSO_JWT_SECRET, { expirationTime });
   }
 
   /**
@@ -413,7 +413,7 @@ export class SessionManager {
     }
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     /** @type {{ payload: { email: string, tid: string } & import('jose').JWTPayload }} */
-    const { payload } = await this.#jwtManager.decrypt(token, this.#config.SSO_CLIENT_SECRET);
+    const { payload } = await this.#jwtManager.decrypt(token, this.#config.SSO_JWT_SECRET);
 
     if (includeUserData) {
       /** @type {{ email: string, tid: string }} Extract email and token ID */
@@ -556,7 +556,7 @@ export class SessionManager {
 
       // Decrypt new user data from SSO
       const { jwt } = response.data;
-      const { payload: newPayload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
+      const { payload: newPayload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_JWT_SECRET);
 
       if (!newPayload?.user) {
         throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload from SSO');
@@ -610,7 +610,7 @@ export class SessionManager {
       if (response.status === httpCodes.OK) {
         /** @type {{ jwt: string }} */
         const { jwt } = response.data;
-        const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
+        const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_JWT_SECRET);
         const result = await this.#saveSession(req, payload, initUser);
         return res.json(result);
       }
@@ -912,7 +912,7 @@ export class SessionManager {
 
         try {
           // Decrypt JWT from Identity Adapter
-          const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_CLIENT_SECRET);
+          const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_JWT_SECRET);
 
           if (!payload?.user) {
             throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');

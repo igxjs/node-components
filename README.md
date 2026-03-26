@@ -30,7 +30,7 @@ import { SessionManager, SessionMode } from '@igxjs/node-components';
 export const session = new SessionManager({
   SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
   SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
-  SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET,
+  SSO_JWT_SECRET: process.env.SSO_JWT_SECRET,
   SESSION_SECRET: process.env.SESSION_SECRET,
   REDIS_URL: process.env.REDIS_URL
 });
@@ -40,7 +40,7 @@ export const tokenSession = new SessionManager({
   SESSION_MODE: SessionMode.TOKEN,  // Use token-based authentication
   SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
   SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
-  SSO_CLIENT_SECRET: process.env.SSO_CLIENT_SECRET,
+  SSO_JWT_SECRET: process.env.SSO_JWT_SECRET,
   SESSION_SECRET: process.env.SESSION_SECRET,
   REDIS_URL: process.env.REDIS_URL,
 });
@@ -186,7 +186,7 @@ fetch('/api/protected', {
 |--------|------|---------|-------------|
 | `SSO_ENDPOINT_URL` | string | - | Identity provider endpoint URL |
 | `SSO_CLIENT_ID` | string | - | SSO client ID |
-| `SSO_CLIENT_SECRET` | string | - | SSO client secret |
+| `SSO_JWT_SECRET` | string | - | SSO client secret |
 | `SSO_SUCCESS_URL` | string | - | Redirect URL after successful login (token mode) |
 | `SSO_FAILURE_URL` | string | - | Redirect URL after failed login (token mode) |
 | `SESSION_MODE` | string | `SessionMode.SESSION` | Authentication mode: `SessionMode.SESSION` or `SessionMode.TOKEN` |

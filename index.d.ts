@@ -94,11 +94,12 @@ export interface SessionConfig {
   SSO_CLIENT_ID?: string;
 
   /** 
-   * OAuth2 Client Secret for authentication
-   * @example 'super-secret-client-key'
+   * Secret key used for encrypting and decrypting JWT tokens
+   * This is used internally to secure session tokens, NOT for Identity Provider authentication
+   * @example 'super-secret-jwt-key'
    * @required Required when using SSO authentication
    */
-  SSO_CLIENT_SECRET?: string;
+  SSO_JWT_SECRET?: string;
 
   /** 
    * Redirect URL after successful SSO login
@@ -281,7 +282,7 @@ export class SessionManager {
    * const sessionManager = new SessionManager({
    *   SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1',
    *   SSO_CLIENT_ID: 'my-app-client-id',
-   *   SSO_CLIENT_SECRET: 'secret-key',
+   *   SSO_JWT_SECRET: 'secret-key',
    *   SESSION_MODE: 'session', // or 'token' for JWT-based auth
    *   SESSION_SECRET: 'your-session-secret',
    *   REDIS_URL: 'redis://localhost:6379'
@@ -333,7 +334,7 @@ export class SessionManager {
    * });
    * ```
    */
-  getUser(req: Request, includeUserData: boolean?): Promise<SessionUser>;
+  getUser(req: Request, includeUserData: boolean | false): Promise<SessionUser>;
 
   /**
    * Initialize the session configurations and middleware
