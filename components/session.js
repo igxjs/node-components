@@ -657,11 +657,11 @@ export class SessionManager {
     } catch (error) {
       this.#logger.error('### LOGOUT ALL TOKENS ERROR ###', error);
       if (isRedirect) {
-        return res.redirect(this.#config.SSO_FAILURE_URL);
+        return res.redirect(this.#getFailureRedirectUrl(error.message));
       }
       return res.status(httpCodes.SYSTEM_FAILURE).json({
         error: 'Logout all failed',
-        redirect_url: this.#config.SSO_FAILURE_URL
+        redirect_url: this.#getFailureRedirectUrl(error.message),
       });
     }
   }
@@ -706,11 +706,11 @@ export class SessionManager {
     } catch (error) {
       this.#logger.error('### TOKEN LOGOUT ERROR ###', error);
       if (isRedirect) {
-        return res.redirect(this.#config.SSO_FAILURE_URL);
+        return res.redirect(this.#getFailureRedirectUrl(error.message));
       }
       return res.status(httpCodes.SYSTEM_FAILURE).json({
         error: 'Logout failed',
-        redirect_url: this.#config.SSO_FAILURE_URL
+        redirect_url: this.#getFailureRedirectUrl(error.message),
       });
     }
   }
@@ -899,6 +899,15 @@ export class SessionManager {
   }
 
   /**
+   * Get failure redirect URL
+   * @param {string} reason Reason for failure
+   * @returns {string} Failure redirect URL
+   */
+  #getFailureRedirectUrl(reason = '') {
+    return this.#config.SSO_FAILURE_URL.concat('?reason=').concat(encodeURIComponent(reason));
+  }
+
+  /**
    * SSO callback for successful login
    * @param {(user: object) => object} initUser Initialize user object function
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
@@ -945,7 +954,7 @@ export class SessionManager {
         } else if (error.code === 'ERR_JWT_INVALID') {
           errorMessage = 'Invalid authentication token';
         }
-        return res.redirect(this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(errorMessage)));
+        return res.redirect(this.#getFailureRedirectUrl(errorMessage));
       }
     };
   }
@@ -1011,11 +1020,9 @@ export class SessionManager {
           this.#logger.error('### LOGOUT CALLBACK ERROR ###');
           this.#logger.error(error);
           if (isRedirect) {
-            return res.redirect(this.#config.SSO_FAILURE_URL);
+            return res.redirect(this.#getFailureRedirectUrl(error.message));
           }
-          return res.status(httpCodes.AUTHORIZATION_FAILED).send({
-            redirect_url: this.#config.SSO_FAILURE_URL
-          });
+          return res.status(httpCodes.AUTHORIZATION_FAILED).send({ redirect_url: this.#getFailureRedirectUrl(error.message) });
         }
         if (isRedirect) {
           return res.redirect(this.#config.SSO_SUCCESS_URL);
