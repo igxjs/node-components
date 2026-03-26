@@ -50,7 +50,7 @@ export class SessionConfig {
    */
   SSO_ENDPOINT_URL;
   /** @type {string} */
-  SSO_CLIENT_ID;
+  SSO_APP_ID;
   /** @type {string} */
   SSO_JWT_SECRET;
   /** @type {string} */
@@ -169,8 +169,8 @@ export class SessionManager {
    */
   #validateSsoConfig(config) {
     if (config.SSO_ENDPOINT_URL) {
-      if (!config.SSO_CLIENT_ID) {
-        throw new Error('SSO_CLIENT_ID is required when SSO_ENDPOINT_URL is provided');
+      if (!config.SSO_APP_ID) {
+        throw new Error('SSO_APP_ID is required when SSO_ENDPOINT_URL is provided');
       }
       if (!config.SSO_JWT_SECRET) {
         throw new Error('SSO_JWT_SECRET is required when SSO_ENDPOINT_URL is provided');
@@ -210,7 +210,7 @@ export class SessionManager {
       SESSION_EXPIRY_KEY: config.SESSION_EXPIRY_KEY || 'session_expires_at',
       TOKEN_STORAGE_TEMPLATE_PATH: config.TOKEN_STORAGE_TEMPLATE_PATH,
       SSO_ENDPOINT_URL: config.SSO_ENDPOINT_URL,
-      SSO_CLIENT_ID: config.SSO_CLIENT_ID,
+      SSO_APP_ID: config.SSO_APP_ID,
       SSO_JWT_SECRET: config.SSO_JWT_SECRET,
       SSO_SUCCESS_URL: config.SSO_SUCCESS_URL,
       SSO_FAILURE_URL: config.SSO_FAILURE_URL,
@@ -871,91 +871,91 @@ export class SessionManager {
           if (err) {
             this.#logger.error('### SESSION SAVE ERROR ###');
             this.#logger.error(err);
-            return reject(new CustomError(httpCodes.SYSTEM_FAILURE,  'Session failed to save', err));
+            return reject(new CustomError(httpCodes.SYSTEM_FAILURE, 'Session failed to save', err));
           }
           return resolve(payload);
         });
       });
     }
     throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
+  };
+
+  /**
+   * Render HTML template for token storage
+   * @param {string} token JWT token
+   * @param {string} expiresAt Expiry timestamp
+   * @param {string} sucessRedirectUrl Success redirect URL
+   * @returns {string} Rendered HTML
+   * @private
+   */
+  #renderTokenStorageHtml(token, expiresAt, sucessRedirectUrl) {
+    return this.#htmlTemplate
+      .replaceAll('{{SESSION_DATA_KEY}}', this.#config.SESSION_KEY)
+      .replaceAll('{{SESSION_DATA_VALUE}}', token)
+      .replaceAll('{{SESSION_EXPIRY_KEY}}', this.#config.SESSION_EXPIRY_KEY)
+      .replaceAll('{{SESSION_EXPIRY_VALUE}}', expiresAt)
+      .replaceAll('{{SSO_SUCCESS_URL}}', sucessRedirectUrl)
+      .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
+  }
+
+  /**
+   * SSO callback for successful login
+   * @param {(user: object) => object} initUser Initialize user object function
+   * @returns {import('@types/express').RequestHandler} Returns express Request Handler
+   */
+  callback(initUser) {
+    return async (req, res, next) => {
+      const { jwt = '' } = req.query;
+      if (!jwt) {
+        return next(new CustomError(httpCodes.BAD_REQUEST, 'Missing `jwt` in query parameters'));
+      }
+
+      try {
+        // Decrypt JWT from Identity Adapter
+        const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_JWT_SECRET);
+
+        if (!payload?.user) {
+          throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
+        }
+
+        /** @type {string} */
+        const callbackRedirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
+
+        // Token mode: Generate token and return HTML page
+        if (this.getSessionMode() === SessionMode.TOKEN) {
+          /** @type {import('../index.js').SessionUser} */
+          const user = initUser(payload.user);
+          // Generate unique token ID for this device/session
+          const tid = crypto.randomUUID();
+          const token = await this.#generateAndStoreToken(tid, user);
+          this.#logger.debug('### CALLBACK TOKEN GENERATED ###');
+          const html = this.#renderTokenStorageHtml(token, user.attributes.expires_at, callbackRedirectUrl);
+          return res.send(html);
+        }
+
+        // Session mode: Save to session and redirect
+        await this.#saveSession(req, payload, initUser);
+        return res.redirect(callbackRedirectUrl);
+      }
+      catch (error) {
+        this.#logger.error('### CALLBACK ERROR ###', error);
+        let errorMessage = error.message;
+        if (error.code === 'ERR_JWT_EXPIRED') {
+          errorMessage = 'Authentication token expired';
+        } else if (error.code === 'ERR_JWT_INVALID') {
+          errorMessage = 'Invalid authentication token';
+        }
+        return res.redirect(this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(errorMessage)));
+      }
     };
-
-    /**
-     * Render HTML template for token storage
-     * @param {string} token JWT token
-     * @param {string} expiresAt Expiry timestamp
-     * @param {string} sucessRedirectUrl Success redirect URL
-     * @returns {string} Rendered HTML
-     * @private
-     */
-    #renderTokenStorageHtml(token, expiresAt, sucessRedirectUrl) {
-      return this.#htmlTemplate
-        .replaceAll('{{SESSION_DATA_KEY}}', this.#config.SESSION_KEY)
-        .replaceAll('{{SESSION_DATA_VALUE}}', token)
-        .replaceAll('{{SESSION_EXPIRY_KEY}}', this.#config.SESSION_EXPIRY_KEY)
-        .replaceAll('{{SESSION_EXPIRY_VALUE}}', expiresAt)
-        .replaceAll('{{SSO_SUCCESS_URL}}', sucessRedirectUrl)
-        .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
-    }
-
-    /**
-     * SSO callback for successful login
-     * @param {(user: object) => object} initUser Initialize user object function
-     * @returns {import('@types/express').RequestHandler} Returns express Request Handler
-     */
-    callback(initUser) {
-      return async (req, res, next) => {
-        const { jwt = '' } = req.query;
-        if (!jwt) {
-          return next(new CustomError(httpCodes.BAD_REQUEST, 'Missing `jwt` in query parameters'));
-        }
-
-        try {
-          // Decrypt JWT from Identity Adapter
-          const { payload } = await this.#jwtManager.decrypt(jwt, this.#config.SSO_JWT_SECRET);
-
-          if (!payload?.user) {
-            throw new CustomError(httpCodes.BAD_REQUEST, 'Invalid JWT payload');
-          }
-
-          /** @type {string} */
-          const callbackRedirectUrl = payload.redirect_url || this.#config.SSO_SUCCESS_URL;
-
-          // Token mode: Generate token and return HTML page
-          if (this.getSessionMode() === SessionMode.TOKEN) {
-            /** @type {import('../index.js').SessionUser} */
-            const user = initUser(payload.user);
-            // Generate unique token ID for this device/session
-            const tid = crypto.randomUUID();
-            const token = await this.#generateAndStoreToken(tid, user);
-            this.#logger.debug('### CALLBACK TOKEN GENERATED ###');
-            const html = this.#renderTokenStorageHtml(token, user.attributes.expires_at, callbackRedirectUrl);
-            return res.send(html);
-          }
-
-          // Session mode: Save to session and redirect
-          await this.#saveSession(req, payload, initUser);
-          return res.redirect(callbackRedirectUrl);
-        }
-        catch (error) {
-          this.#logger.error('### CALLBACK ERROR ###', error);
-          let errorMessage = error.message;
-          if (error.code === 'ERR_JWT_EXPIRED') {
-            errorMessage = 'Authentication token expired';
-          } else if (error.code === 'ERR_JWT_INVALID') {
-            errorMessage = 'Invalid authentication token';
-          }
-          return res.redirect(this.#config.SSO_FAILURE_URL.concat('?message=').concat(encodeURIComponent(errorMessage)));
-        }
-      };
-    }
+  }
 
   /**
    * Get Identity Providers
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
   identityProviders() {
-    const idpUrl = '/auth/providers'.concat('?client_id=').concat(this.#config.SSO_CLIENT_ID);
+    const idpUrl = '/auth/providers'.concat('?app_id=').concat(this.#config.SSO_APP_ID);
     return async (_req, res, next) => {
       try {
         const response = await this.#idpRequest.get(idpUrl);
@@ -976,7 +976,7 @@ export class SessionManager {
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
   refresh(initUser) {
-    const idpRefreshUrl = '/auth/refresh'.concat('?client_id=').concat(this.#config.SSO_CLIENT_ID);
+    const idpRefreshUrl = '/auth/refresh'.concat('?app_id=').concat(this.#config.SSO_APP_ID);
     return async (req, res, next) => {
       const mode = this.getSessionMode() || SessionMode.SESSION;
 

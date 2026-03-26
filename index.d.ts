@@ -87,11 +87,11 @@ export interface SessionConfig {
   SSO_ENDPOINT_URL?: string;
 
   /** 
-   * OAuth2 Client ID registered with the Identity Provider
-   * @example 'my-app-client-id'
+   * Application ID used to integrate with the Identity Provider microservice
+   * @example 'my-app-id'
    * @required Required when using SSO authentication
    */
-  SSO_CLIENT_ID?: string;
+  SSO_APP_ID?: string;
 
   /** 
    * Secret key used for encrypting and decrypting JWT tokens
@@ -281,7 +281,7 @@ export class SessionManager {
    * ```javascript
    * const sessionManager = new SessionManager({
    *   SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1',
-   *   SSO_CLIENT_ID: 'my-app-client-id',
+   *   SSO_APP_ID: 'my-app-id',
    *   SSO_JWT_SECRET: 'secret-key',
    *   SESSION_MODE: 'session', // or 'token' for JWT-based auth
    *   SESSION_SECRET: 'your-session-secret',

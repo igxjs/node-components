@@ -208,7 +208,7 @@ it('should fallback to memory store if Redis fails', async () => {
 ### Required for SSO
 ```bash
 SSO_ENDPOINT_URL=https://sso.example.com
-SSO_CLIENT_ID=your-client-id
+SSO_APP_ID=your-app-id
 SSO_JWT_SECRET=your-client-secret
 SESSION_SECRET=your-session-secret
 ```

@@ -46,7 +46,7 @@ const config = {
 
   // SSO Configuration
   SSO_ENDPOINT_URL: 'https://sso.example.com',
-  SSO_CLIENT_ID: 'your-client-id',
+  SSO_APP_ID: 'your-client-id',
   SSO_JWT_SECRET: 'your-client-secret',
   SSO_SUCCESS_URL: '/dashboard',      // Required for TOKEN mode
   SSO_FAILURE_URL: '/login',          // Required for TOKEN mode
@@ -79,7 +79,7 @@ const config = {
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|---------|
 | `SSO_ENDPOINT_URL` | string | Yes | - | **Identity Provider microservice endpoint URL** - Base URL for your customized SSO authentication service. See [Identity Provider Microservice](#identity-provider-microservice) section for API details. Example: `https://idp.example.com/open/api/v1` |
-| `SSO_CLIENT_ID` | string | Yes | - | SSO client ID |
+| `SSO_APP_ID` | string | Yes | - | Application ID used to integrate with the Identity Provider microservice |
 | `SSO_JWT_SECRET` | string | Yes | - | SSO client secret |
 | `SSO_SUCCESS_URL` | string | TOKEN only | - | Redirect URL after successful login |
 | `SSO_FAILURE_URL` | string | TOKEN only | - | Redirect URL after failed login |
@@ -217,7 +217,7 @@ import { SessionManager, SessionMode } from '@igxjs/node-components';
 // Create SessionManager with SESSION mode (default)
 export const session = new SessionManager({
   SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
-  SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
+  SSO_APP_ID: process.env.SSO_APP_ID,
   SSO_JWT_SECRET: process.env.SSO_JWT_SECRET,
   SESSION_AGE: 64800,  // 18 hours in seconds
   SESSION_SECRET: process.env.SESSION_SECRET,  // JWT encryption key
@@ -273,7 +273,7 @@ import { SessionManager, SessionMode } from '@igxjs/node-components';
 // Create SessionManager with TOKEN mode
 export const session = new SessionManager({
   SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
-  SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
+  SSO_APP_ID: process.env.SSO_APP_ID,
   SSO_JWT_SECRET: process.env.SSO_JWT_SECRET,
   SSO_SUCCESS_URL: '/dashboard',
   SSO_FAILURE_URL: '/login',

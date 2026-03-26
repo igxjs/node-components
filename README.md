@@ -29,7 +29,7 @@ import { SessionManager, SessionMode } from '@igxjs/node-components';
 // Create singleton instance with SESSION authentication (default)
 export const session = new SessionManager({
   SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
-  SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
+  SSO_APP_ID: process.env.SSO_APP_ID,
   SSO_JWT_SECRET: process.env.SSO_JWT_SECRET,
   SESSION_SECRET: process.env.SESSION_SECRET,
   REDIS_URL: process.env.REDIS_URL
@@ -39,7 +39,7 @@ export const session = new SessionManager({
 export const tokenSession = new SessionManager({
   SESSION_MODE: SessionMode.TOKEN,  // Use token-based authentication
   SSO_ENDPOINT_URL: process.env.SSO_ENDPOINT_URL,
-  SSO_CLIENT_ID: process.env.SSO_CLIENT_ID,
+  SSO_APP_ID: process.env.SSO_APP_ID,
   SSO_JWT_SECRET: process.env.SSO_JWT_SECRET,
   SESSION_SECRET: process.env.SESSION_SECRET,
   REDIS_URL: process.env.REDIS_URL,
@@ -185,8 +185,8 @@ fetch('/api/protected', {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `SSO_ENDPOINT_URL` | string | - | Identity provider endpoint URL |
-| `SSO_CLIENT_ID` | string | - | SSO client ID |
-| `SSO_JWT_SECRET` | string | - | SSO client secret |
+| `SSO_APP_ID` | string | - | Application ID used to integrate with the Identity Provider microservice |
+| `SSO_JWT_SECRET` | string | - | Secret key used for encrypting/decrypting JWT tokens |
 | `SSO_SUCCESS_URL` | string | - | Redirect URL after successful login (token mode) |
 | `SSO_FAILURE_URL` | string | - | Redirect URL after failed login (token mode) |
 | `SESSION_MODE` | string | `SessionMode.SESSION` | Authentication mode: `SessionMode.SESSION` or `SessionMode.TOKEN` |
