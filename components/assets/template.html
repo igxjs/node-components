@@ -1,25 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>Sign in IBM Garage</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no,viewport-fit=cover,minimum-scale=1,maximum-scale=2">
+    <meta charset="UTF-8">
+    <title>Signing in...</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no,viewport-fit=cover">
     <meta name="robots" content="noindex, nofollow" />
     <style>
       :root {
-        --foreground-color-primary: #444;
-        --font-size: 0.8rem;
-        --background-color-primary: #f1f1f199;
-        --gap-global: 0.4rem;
+        --foreground-color-primary: #2a2a3a;
+        --foreground-color-muted: #6b6b80;
+        --font-size: 0.95rem;
+        --background-card: rgba(255, 255, 255, 0.55);
+        --background-card-border: rgba(255, 255, 255, 0.7);
+        --link-color: #4a5fc1;
+        --gap-global: 1.1rem;
+        --radius: 18px;
       }
       @media (prefers-color-scheme: dark) {
         :root {
-          --background-color-primary: black;
-          --foreground-color-primary: #bbb;
+          --foreground-color-primary: #e6e6f0;
+          --foreground-color-muted: #a0a0b8;
+          --background-card: rgba(20, 20, 30, 0.55);
+          --background-card-border: rgba(255, 255, 255, 0.12);
+          --link-color: #9bb0ff;
         }
       }
       html, body {
-        padding: 0px;
-        margin: 0px auto;
+        padding: 0;
+        margin: 0;
         height: 100%;
         width: 100%;
       }
@@ -33,82 +41,178 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: Verdana, Helvetica, Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Verdana, Helvetica, Arial, sans-serif;
         font-size: var(--font-size);
         color: var(--foreground-color-primary);
-        flex-flow: column;
-        position: relative;
-        z-index: 10;
         overflow: hidden;
       }
-      body::before {
-        background: var(--background-color-primary);
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: -1;
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-      }
-      .wrapper {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+      .card {
+        background: var(--background-card);
+        border: 1px solid var(--background-card-border);
+        border-radius: var(--radius);
+        padding: 3rem 2.5rem;
+        width: min(440px, calc(100% - 2rem));
         box-sizing: border-box;
-        row-gap: var(--gap-global);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+        backdrop-filter: blur(16px) saturate(140%);
+        -webkit-backdrop-filter: blur(16px) saturate(140%);
+        display: flex;
         flex-direction: column;
-        padding: var(--gap-global);
+        align-items: center;
+        row-gap: var(--gap-global);
+        text-align: center;
       }
-      .wrapper #failure {
+      .card p {
+        margin: 0;
+      }
+      .status {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        row-gap: 1rem;
+        font-size: 1.05rem;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+      }
+      .spinner {
+        width: 28px;
+        height: 28px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+        opacity: 0.55;
+      }
+      .icon-fail {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #d9534f;
+        color: #fff;
+        font-size: 1.1rem;
+        line-height: 28px;
+        font-weight: 600;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .spinner {
+          animation: none;
+          border-right-color: currentColor;
+          opacity: 0.4;
+        }
+      }
+      .hint {
+        color: var(--foreground-color-muted);
+        font-size: 0.85rem;
+        line-height: 1.5;
+      }
+      .link {
+        color: var(--link-color);
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+        transition: border-color 0.15s ease;
+      }
+      .link:hover {
+        border-bottom-color: currentColor;
+      }
+      .hidden {
         display: none;
       }
     </style>
   </head>
 <body>
-  <hr />
-  <div class="wrapper">
-    <div id="success">Redirecting... <a href="{{SSO_SUCCESS_URL}}" target="_blank" style="color: blue; text-decoration: underline;">(click here if not redirected)</a></div>
-    <div id="failure">
-      <p>Authentication failed. Please try again.</p>
-      <a href="{{SSO_FAILURE_URL}}">Return to login</a>
+  <div class="card">
+    <div id="success">
+      <div class="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>Redirecting</span>
+      </div>
+      <div class="hint">
+        Not redirected? <a id="success-link" class="link" href="{{SSO_SUCCESS_URL}}">click here</a>
+      </div>
+      <noscript>
+        <div class="hint">
+          JavaScript is disabled. <a id="success-link-noscript" class="link" href="{{SSO_SUCCESS_URL}}">Continue manually</a>
+        </div>
+      </noscript>
+    </div>
+    <div id="failure" class="hidden" role="alert">
+      <div class="status">
+        <span class="icon-fail" aria-hidden="true">!</span>
+        <span>Authentication failed</span>
+      </div>
+      <div id="failure-retry" class="hint">
+        Please try again. <a id="failure-link" class="link" href="{{SSO_FAILURE_URL}}">Return to login</a>
+      </div>
+      <div id="failure-fatal" class="hint hidden">
+        Something went wrong and we cannot redirect you. Please close this window and try again, or contact support.
+      </div>
     </div>
   </div>
   <script>
   (function() {
-    let success = true;
+    // Only http(s) URLs are allowed; anything else (javascript:, data:,
+    // vbscript:, ...) is rejected to prevent the server-rendered URL from
+    // becoming an XSS or open-redirect sink.
+    function isSafeUrl(value) {
+      if (typeof value !== 'string' || value === '') return false;
+      try {
+        const parsed = new URL(value, window.location.href);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      } catch (_) {
+        return false;
+      }
+    }
 
-    // Check localStorage support first
-    if (typeof localStorage !== 'object' || typeof localStorage.setItem !== 'function') {
-      console.warn('localStorage not supported, falling back to session cookie');
-      success = false;
+    function neutralize(id) {
+      const el = document.getElementById(id);
+      if (el) el.removeAttribute('href');
+    }
+
+    function showFailure(fatal) {
+      document.title = 'Sign-in failed';
+      document.getElementById('success').classList.add('hidden');
+      document.getElementById('failure').classList.remove('hidden');
+      if (fatal) {
+        document.getElementById('failure-retry').classList.add('hidden');
+        document.getElementById('failure-fatal').classList.remove('hidden');
+      }
+    }
+
+    const successUrl = '{{SSO_SUCCESS_URL}}';
+    const failureUrl = '{{SSO_FAILURE_URL}}';
+    const successOk = isSafeUrl(successUrl);
+    const failureOk = isSafeUrl(failureUrl);
+
+    if (!successOk) {
+      neutralize('success-link');
+    }
+    if (!failureOk) {
+      neutralize('failure-link');
+    }
+
+    if (!successOk) {
+      showFailure(!failureOk);
+      return;
     }
 
     try {
-      // Try localStorage first
-      if (localStorage.setItem) {
-        localStorage.setItem('{{SESSION_DATA_KEY}}', '{{SESSION_DATA_VALUE}}');
-        localStorage.setItem('{{SESSION_EXPIRY_KEY}}', '{{SESSION_EXPIRY_VALUE}}');
+      // TOKEN mode requires localStorage — there is no session cookie
+      // fallback, so without it the redirect would land unauthenticated.
+      if (typeof localStorage !== 'object' || typeof localStorage.setItem !== 'function') {
+        console.error('localStorage not supported; cannot persist token');
+        showFailure(!failureOk);
+        return;
       }
-
-      /**
-       * Note: You can also request full user informlation by using ajax request or loading server side page.
-       */
-
-      // Fall back to simple navigation
-      location.href = '{{SSO_SUCCESS_URL}}';
+      localStorage.setItem('{{SESSION_DATA_KEY}}', '{{SESSION_DATA_VALUE}}');
+      localStorage.setItem('{{SESSION_EXPIRY_KEY}}', '{{SESSION_EXPIRY_VALUE}}');
+      location.href = successUrl;
     }
     catch (e) {
       console.error('Redirect failed:', e);
-      success = false;
-    }
-
-    if (!success) {
-      document.getElementById('success').style.display = 'none';
-      document.getElementById('failure').style.display = 'block';
+      showFailure(!failureOk);
     }
   })();
   </script>

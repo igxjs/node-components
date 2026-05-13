@@ -25,6 +25,44 @@ export const SessionMode = {
 };
 
 /**
+ * Escape a value for safe interpolation inside a single-quoted JS string
+ * literal (e.g. `'{{PLACEHOLDER}}'`). Also blocks `</script>` breakout.
+ * @param {string} value
+ * @returns {string}
+ */
+const escapeJsString = (value) => String(value)
+  .replaceAll('\\', '\\\\')
+  .replaceAll("'", "\\'")
+  .replaceAll('"', '\\"')
+  .replaceAll('\n', '\\n')
+  .replaceAll('\r', '\\r')
+  .replaceAll(' ', '\\u2028')
+  .replaceAll(' ', '\\u2029')
+  .replaceAll('<', '\\x3c')
+  .replaceAll('>', '\\x3e')
+  .replaceAll('&', '\\x26');
+
+/**
+ * Escape a URL placeholder so it is safe in both HTML attribute and JS string
+ * contexts (the URL placeholders appear in both). Percent-encodes characters
+ * that would let an attacker break out of either context. `&` is preserved
+ * since it is a legitimate URL query separator.
+ * @param {string} value
+ * @returns {string}
+ */
+const escapeUrlPlaceholder = (value) => String(value)
+  .replaceAll('\\', '%5C')
+  .replaceAll("'", '%27')
+  .replaceAll('"', '%22')
+  .replaceAll('<', '%3C')
+  .replaceAll('>', '%3E')
+  .replaceAll('`', '%60')
+  .replaceAll('\n', '%0A')
+  .replaceAll('\r', '%0D')
+  .replaceAll(' ', '%E2%80%A8')
+  .replaceAll(' ', '%E2%80%A9');
+
+/**
  * Session configuration options
  */
 export class SessionConfig {
@@ -890,12 +928,12 @@ export class SessionManager {
    */
   #renderTokenStorageHtml(token, expiresAt, sucessRedirectUrl) {
     return this.#htmlTemplate
-      .replaceAll('{{SESSION_DATA_KEY}}', this.#config.SESSION_KEY)
-      .replaceAll('{{SESSION_DATA_VALUE}}', token)
-      .replaceAll('{{SESSION_EXPIRY_KEY}}', this.#config.SESSION_EXPIRY_KEY)
-      .replaceAll('{{SESSION_EXPIRY_VALUE}}', expiresAt)
-      .replaceAll('{{SSO_SUCCESS_URL}}', sucessRedirectUrl)
-      .replaceAll('{{SSO_FAILURE_URL}}', this.#config.SSO_FAILURE_URL);
+      .replaceAll('{{SESSION_DATA_KEY}}', escapeJsString(this.#config.SESSION_KEY))
+      .replaceAll('{{SESSION_DATA_VALUE}}', escapeJsString(token))
+      .replaceAll('{{SESSION_EXPIRY_KEY}}', escapeJsString(this.#config.SESSION_EXPIRY_KEY))
+      .replaceAll('{{SESSION_EXPIRY_VALUE}}', escapeJsString(expiresAt))
+      .replaceAll('{{SSO_SUCCESS_URL}}', escapeUrlPlaceholder(sucessRedirectUrl))
+      .replaceAll('{{SSO_FAILURE_URL}}', escapeUrlPlaceholder(this.#config.SSO_FAILURE_URL));
   }
 
   /**
