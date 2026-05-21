@@ -59,6 +59,7 @@ app.use(express.json());
 await session.setup(app);
 
 // Auth endpoints
+// Providers and refresh can receive ?app_id=tenant-a to override SSO_APP_ID for that request.
 app.get('/auth/providers', session.identityProviders());
 app.get('/auth/callback',  session.callback((u) => u));
 app.post('/auth/refresh',  session.authenticate(), session.refresh((u) => u));

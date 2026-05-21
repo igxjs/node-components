@@ -9,13 +9,14 @@
 
 | Method | Path | Used by SessionManager method | Purpose |
 |--------|------|-------------------------------|---------|
-| GET | `/auth/providers` | `identityProviders()` | List available IdPs (id, name, icon, login URL) |
+| GET | `/auth/providers?app_id={appId}` | `identityProviders()` | List available IdPs (id, name, icon, login URL) |
 | POST | `/auth/login/:idp` | (client-initiated, returns redirect URL) | Build login URL for selected IdP |
 | GET | `/auth/callback/:idp` | `callback()` | Validate IdP redirect, return user JWT |
 | POST | `/auth/verify` | (internal) | Verify a JWT issued by the IdP |
-| POST | `/auth/refresh` | `refresh()` | Renew access/refresh tokens |
+| POST | `/auth/refresh?app_id={appId}` | `refresh()` | Renew access/refresh tokens |
 
 The base URL must include the API version prefix, e.g., `https://idp.example.com/open/api/v1`.
+For `identityProviders()` and `refresh()`, `SessionManager` reads a string `req.query.app_id` and falls back to `SSO_APP_ID` when it is empty or missing.
 
 ## /auth/providers response shape
 

@@ -30,6 +30,7 @@ app.use(express.json());
 await session.setup(app);
 
 // SSO entry points
+// Optional query override: /auth/providers?app_id=tenant-a
 app.get('/auth/providers', session.identityProviders());
 app.get('/auth/callback',  session.callback((user) => ({
   ...user,
@@ -38,6 +39,7 @@ app.get('/auth/callback',  session.callback((user) => ({
 })));
 
 // Refresh and logout
+// Optional query override: /auth/refresh?app_id=tenant-a
 app.post('/auth/refresh', session.authenticate(), session.refresh((user) => ({
   ...user,
   refreshedAt: new Date(),

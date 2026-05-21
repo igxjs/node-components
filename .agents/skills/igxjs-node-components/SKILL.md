@@ -1,6 +1,6 @@
 ---
 name: igxjs-node-components
-description: This skill should be used when the user asks to "integrate @igxjs/node-components", "set up SSO with node-components", "use SessionManager", "configure FlexRouter", "use JwtManager / JWE encryption", "wire up RedisManager", "use httpErrorHandler / httpError / CustomError", or mentions adding any of these components to an Express.js application. Provides installation, configuration, and integration guidance for the @igxjs/node-components package.
+description: Use this skill whenever the user wants to integrate, debug, migrate, or configure @igxjs/node-components in an Express.js app, including SSO with SessionManager, SESSION vs TOKEN mode, request-level app_id handling, FlexRouter, JwtManager/JWE encryption, RedisManager, Logger, or httpErrorHandler/httpError/CustomError. Also use it for fixing existing node-components integrations, migrating SESSION to TOKEN, wiring auth providers/refresh/logout/callback routes, or explaining the Identity Provider microservice contract.
 ---
 
 # Integrating @igxjs/node-components
@@ -93,7 +93,16 @@ Routes registered before `setup()` resolves will not have session middleware att
 
 ### TOKEN mode requires Redis and the two redirect URLs
 
-If `SESSION_MODE: SessionMode.TOKEN`, the consumer must set `REDIS_URL`, `SSO_SUCCESS_URL`, and `SSO_FAILURE_URL`. Memory store is not supported in TOKEN mode. Tokens are stored in Redis under the key pattern `{SESSION_PREFIX}{SESSION_KEY}:{email}:{tid}`.
+If `SESSION_MODE: SessionMode.TOKEN`, the consumer must set `REDIS_URL`, `SSO_SUCCESS_URL`, and `SSO_FAILURE_URL`. Memory store is not supported in TOKEN mode. Token user data is stored in Redis under `{SESSION_KEY}:{email}:{tid}`; `SESSION_PREFIX` is used by the express-session Redis store, not by TOKEN-mode token keys.
+
+### `identityProviders()` and `refresh()` can use request-level `app_id`
+
+Both methods read an optional string `req.query.app_id` and fall back to `SSO_APP_ID` when it is empty or missing. Use this when one Express app integrates multiple IdP app registrations:
+
+```javascript
+app.get('/auth/providers', session.identityProviders()); // /auth/providers?app_id=tenant-a
+app.post('/auth/refresh', session.authenticate(), session.refresh(initUser)); // /auth/refresh?app_id=tenant-a
+```
 
 ### `httpErrorHandler` must be the last middleware; `httpNotFoundHandler` goes immediately before it
 
@@ -120,7 +129,7 @@ A typical "SSO + protected API" integration looks like this. Copy from [examples
 1. Add an Identity Provider microservice URL to env (`SSO_ENDPOINT_URL`) — consult [references/identity-provider.md](references/identity-provider.md) if the user asks what endpoints that service must expose.
 2. Create `config/session-manager.js` with the singleton (see [examples/session-mode.js](examples/session-mode.js) or [examples/token-mode.js](examples/token-mode.js)).
 3. In `app.js`: `await session.setup(app)` before defining routes.
-4. Wire `session.callback()`, `session.refresh()`, `session.logout()` to your auth routes.
+4. Wire `session.identityProviders()`, `session.callback()`, `session.refresh()`, `session.logout()` to your auth routes.
 5. Protect routes with `session.authenticate()` + `session.requireUser()`.
 6. Mount feature routers via `FlexRouter` if the project versions APIs under context paths.
 7. Add `httpNotFoundHandler` then `httpErrorHandler` last.
@@ -143,7 +152,7 @@ Working integration snippets are in `examples/`:
 - [examples/token-mode.js](examples/token-mode.js) — minimal TOKEN-mode singleton + app
 - [examples/full-app.js](examples/full-app.js) — SessionManager + FlexRouter + httpErrorHandler wired end-to-end
 - [examples/jwt-standalone.js](examples/jwt-standalone.js) — `JwtManager` for non-SSO token flows
-- [examples/error-handler.js](examples/error-handler.js) — error middleware + Axios error conversion
+- [examples/error-handler.js](examples/error-handler.js) — error middleware + Axios error conversion; install `zod` if copying the validation example
 
 ## References
 
@@ -156,3 +165,7 @@ Detailed per-component docs (load only the one matching the user's task):
 - [references/redis-manager.md](references/redis-manager.md) — TLS connections, direct client usage
 - [references/http-handlers.md](references/http-handlers.md) — error response shape, Zod / Axios helpers
 - [references/logger.md](references/logger.md) — singleton pattern, color detection, NODE_ENV behavior
+
+## Evals
+
+Use [evals/evals.json](evals/evals.json) as the starting prompt set when checking whether changes to this skill improve integration guidance. The set covers SESSION setup, TOKEN mode refresh/app_id behavior, HTTP error handler response shape, and import-style selection.

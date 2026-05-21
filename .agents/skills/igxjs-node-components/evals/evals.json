@@ -1,0 +1,29 @@
+{
+  "skill_name": "igxjs-node-components",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "In an Express ESM app, integrate @igxjs/node-components SessionManager in SESSION mode. I need /auth/providers, /auth/callback, /auth/refresh, /auth/logout, and /api/profile. The app may receive /auth/providers?app_id=tenant-a and /auth/refresh?app_id=tenant-a.",
+      "expected_output": "Shows a singleton SessionManager, awaits setup before routes, wires identityProviders/callback/refresh/logout, protects /api/profile with authenticate + requireUser, and explains app_id query fallback to SSO_APP_ID.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Help me migrate my node-components integration from cookie sessions to TOKEN mode for an SPA. Include config, callback behavior, refresh, logout all devices, and where token data is stored.",
+      "expected_output": "Uses SESSION_MODE: SessionMode.TOKEN with REDIS_URL, SSO_SUCCESS_URL, SSO_FAILURE_URL; explains callback HTML localStorage behavior, Authorization bearer usage, refresh behavior, logout ?all=true, and Redis key pattern {SESSION_KEY}:{email}:{tid}.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I want standardized Express errors using @igxjs/node-components. Show route-level httpError usage, Axios error conversion, Zod validation conversion, middleware order, and the JSON response shape.",
+      "expected_output": "Uses httpNotFoundHandler before httpErrorHandler, uses httpError/httpHelper.handleAxiosError/httpHelper.toZodMessage, notes zod must be installed separately, and shows flat response shape with status/message plus data fields at top level.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "My service is CommonJS on Node 20 and I need to use JwtManager from @igxjs/node-components for password reset links. Give me the right import style and a secure JWE example.",
+      "expected_output": "Uses dynamic import rather than require for Node 20 CommonJS, creates JwtManager with JWT_* constructor options, uses camelCase per-call options, uses a separate secret from SSO/session secrets, and decrypts with subject validation.",
+      "files": []
+    }
+  ]
+}

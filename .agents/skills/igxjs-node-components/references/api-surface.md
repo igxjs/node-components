@@ -174,11 +174,9 @@ Error response shape produced by `httpErrorHandler`:
 
 ```json
 {
-  "error": {
-    "code": 400,
-    "message": "...",
-    "data": { /* optional */ }
-  }
+  "status": 400,
+  "message": "...",
+  "...extraData": "CustomError.data fields are merged at top level"
 }
 ```
 

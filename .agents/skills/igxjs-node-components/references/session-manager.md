@@ -29,9 +29,9 @@
 | `REDIS_URL` | optional (memory fallback) | required | TOKEN mode has no memory fallback |
 | `SESSION_MODE` | omit or `SessionMode.SESSION` | `SessionMode.TOKEN` | |
 | `SESSION_AGE` | optional, default `64800` | optional, default `64800` | seconds |
-| `SESSION_KEY` | optional, default `'session_token'` | optional, default `'session_token'` | session storage key (SESSION) / localStorage key + Redis key prefix (TOKEN) |
+| `SESSION_KEY` | optional, default `'session_token'` | optional, default `'session_token'` | session storage key (SESSION) / localStorage key + Redis token key prefix (TOKEN) |
 | `SESSION_EXPIRY_KEY` | n/a | optional, default `'session_expires_at'` | localStorage key for expiry timestamp |
-| `SESSION_PREFIX` | optional, default `'ibmid:'` | optional, default `'ibmid:'` | Redis key prefix |
+| `SESSION_PREFIX` | optional, default `'ibmid:'` | optional, default `'ibmid:'` | Prefix for express-session Redis store keys; TOKEN-mode token keys do not use this prefix |
 | `TOKEN_STORAGE_TEMPLATE_PATH` | n/a | optional | custom HTML template path; supports `{{SESSION_DATA_KEY}}`, `{{SESSION_DATA_VALUE}}`, `{{SESSION_EXPIRY_KEY}}`, `{{SESSION_EXPIRY_VALUE}}`, `{{SSO_SUCCESS_URL}}`, `{{SSO_FAILURE_URL}}` |
 
 ## Lifecycle
@@ -61,7 +61,6 @@ Registers `express-session` (SESSION mode) and stores client setup; opens Redis 
 - Loads full user data and assigns to `req.user`.
 - SESSION: copies from session store.
 - TOKEN: fetches from Redis using the token's `tid` and email.
-- Caches on the request to avoid duplicate Redis lookups within one request.
 - Always use **after** `authenticate()` (or `verifySession()`/`verifyToken()`).
 
 ### `verifySession(errorRedirectUrl?)` / `verifyToken(errorRedirectUrl?)`
@@ -69,31 +68,30 @@ Force a specific verification regardless of `SESSION_MODE`. Useful for endpoints
 
 ### `callback(initUser)`
 SSO-side callback. `initUser` is a synchronous transform `(user: SessionUser) => SessionUser` invoked after the IdP returns user data — use it to add fields like `displayName` or `loginTime`.
-- SESSION: writes `req.session[SESSION_KEY] = transformedUser`, redirects to `SSO_SUCCESS_URL` or `/`.
-- TOKEN: encrypts a JWT, stores user in Redis at `{SESSION_PREFIX}{SESSION_KEY}:{email}:{tid}`, returns an HTML page that writes the token to `localStorage[SESSION_KEY]` and the expiry to `localStorage[SESSION_EXPIRY_KEY]`, then redirects to `SSO_SUCCESS_URL`.
+- SESSION: writes `req.session[SESSION_KEY] = transformedUser`, then redirects to `payload.redirect_url || SSO_SUCCESS_URL`.
+- TOKEN: encrypts a JWT, stores user in Redis at `{SESSION_KEY}:{email}:{tid}`, returns an HTML page that writes the token to `localStorage[SESSION_KEY]` and the expiry to `localStorage[SESSION_EXPIRY_KEY]`, then redirects to `payload.redirect_url || SSO_SUCCESS_URL`.
 
 ### `refresh(initUser)`
-Renews the session/token by calling the IdP's `POST /auth/refresh` and re-running `initUser`. Acquires a 60-second lock per email via `lock()` to prevent concurrent refresh races. TOKEN mode invalidates the old token after generating the new one.
+Renews the session/token by calling the IdP's `POST /auth/refresh?app_id=...` and re-running `initUser`. The `app_id` query value comes from `req.query.app_id` and falls back to `SSO_APP_ID`. Acquires a 60-second in-memory lock per email via `lock()` to prevent concurrent refresh races. TOKEN mode reuses the same `tid`, overwrites the same Redis user-data key, and returns a newly encrypted bearer token; it does not delete a separate old-token key during refresh.
 
 ### `logout()`
 Reads query params:
 - `?redirect=true` — redirect to `SSO_SUCCESS_URL`/`SSO_FAILURE_URL` after logout.
-- `?all=true` (TOKEN mode only) — delete all `{SESSION_PREFIX}{SESSION_KEY}:{email}:*` keys.
+- `?all=true` (TOKEN mode only) — delete all `{SESSION_KEY}:{email}:*` keys.
 
 ### `getUser(req, includeUserData)` — utility, not middleware
 For custom flows. Throws `CustomError(401)` if not authenticated. `includeUserData` toggles whether to fetch from session/Redis vs. return only the auth payload.
 
 ### `identityProviders()`
-Proxy to `GET {SSO_ENDPOINT_URL}/auth/providers`. Use it to render a login button list.
+Proxy to `GET {SSO_ENDPOINT_URL}/auth/providers?app_id=...`. The `app_id` query value comes from `req.query.app_id` and falls back to `SSO_APP_ID`. Use it to render a login button list, including multi-tenant/provider-selector screens.
 
 ## Redis key patterns (TOKEN mode)
 
 ```
-{SESSION_PREFIX}{SESSION_KEY}:{email}:{tid}     → JSON.stringify(user), TTL = SESSION_AGE seconds
-{SESSION_PREFIX}refresh_lock:{email}            → timestamp string, TTL = 60 seconds
+{SESSION_KEY}:{email}:{tid}     → JSON.stringify(user), TTL = SESSION_AGE seconds
 ```
 
-Default prefix: `ibmid:` (legacy). Override `SESSION_PREFIX` for new projects.
+Refresh locks are held in the `SessionManager` instance's in-memory `Map`, not Redis. Keep `SessionManager` as a singleton so those locks are shared across routes in the process.
 
 ## Singleton pattern
 

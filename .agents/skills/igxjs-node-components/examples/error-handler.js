@@ -3,6 +3,8 @@
 
 import express from 'express';
 import axios from 'axios';
+// Install zod separately if you copy the validation example:
+// npm install zod
 import { z } from 'zod';
 import {
   httpCodes,
@@ -73,9 +75,6 @@ app.listen(3000);
 
 // Response shape produced by httpErrorHandler:
 // {
-//   "error": {
-//     "code": 404,
-//     "message": "Item abc not found",
-//     "data": null
-//   }
+//   "status": 404,
+//   "message": "Item abc not found"
 // }

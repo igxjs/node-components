@@ -36,15 +36,13 @@ Reversed order: `httpNotFoundHandler` never runs because Express stops at the fi
 
 ```json
 {
-  "error": {
-    "code": 400,
-    "message": "Email is required",
-    "data": { "field": "email" }
-  }
+  "status": 400,
+  "message": "Email is required",
+  "field": "email"
 }
 ```
 
-`error` (the original Error object) and `data` (extra context) are both optional. The handler also sets CORS headers and logs the error to the console via `Logger.getInstance('httpError')`.
+`CustomError.data` entries are merged into the top-level response body. `CustomError.error` is kept for logging/diagnostics and is not serialized by the handler. The handler also sets CORS headers and logs the error to the console via `Logger.getInstance('httpError')`.
 
 ## CustomError vs httpError
 
@@ -121,6 +119,6 @@ Positional `{n}` placeholders. Use it when building error messages from translat
 
 ## Notes
 
-- `httpErrorHandler` accepts both `CustomError` and any other thrown error; non-`CustomError` becomes `500 SYSTEM_FAILURE` with the original message.
+- `httpErrorHandler` accepts both `CustomError` and any other thrown error; generic errors without a `code` field render as `400 BAD_REQUEST` with the original message.
 - The handler does not stack-trace unless the underlying error is logged. For dev visibility, your own request logger should log before `httpErrorHandler`.
 - `httpCodes.LOCKED` (423) is used by `SessionManager` when refresh locks are active — surface it to clients as a retryable error.

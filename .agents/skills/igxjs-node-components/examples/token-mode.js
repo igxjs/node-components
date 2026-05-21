@@ -35,6 +35,7 @@ app.use(express.json());
 
 await session.setup(app);
 
+// Optional query override: /auth/providers?app_id=tenant-a
 app.get('/auth/providers', session.identityProviders());
 
 // Callback returns an HTML page that stores token + expiry in localStorage,
@@ -53,6 +54,7 @@ app.get('/api/profile',
 
 app.post('/api/auth/refresh',
   session.authenticate(),
+  // Optional query override: /api/auth/refresh?app_id=tenant-a
   session.refresh((user) => ({ ...user, refreshedAt: new Date() })),
 );
 

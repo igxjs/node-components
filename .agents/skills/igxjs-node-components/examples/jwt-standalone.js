@@ -32,6 +32,7 @@ const stepUpToken = await sessionJwt.encrypt(
   SECRET,
   { expirationTime: '5m', subject: 'step-up' },
 );
+console.log('step-up token length:', stepUpToken.length);
 
 const resetToken = await resetJwt.encrypt({ email: 'jane@example.com' }, SECRET);
 
