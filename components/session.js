@@ -321,6 +321,18 @@ export class SessionManager {
   }
 
   /**
+   * Get Identity Provider URL with request-level app_id fallback.
+   * @param {string} pathname Identity Provider API path
+   * @param {import('@types/express').Request} req Express request object
+   * @returns {string} Identity Provider URL
+   * @private
+   */
+  #getIdpUrl(pathname, req) {
+    const appId = req.query?.app_id || this.#config.SSO_APP_ID;
+    return pathname.concat('?').concat(new URLSearchParams({ app_id: appId }).toString());
+  }
+
+  /**
    * Get session age in milliseconds (for express-session cookie maxAge)
    * @returns {number} Returns the session age in milliseconds
    * @private
@@ -1002,9 +1014,9 @@ export class SessionManager {
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
   identityProviders() {
-    const idpUrl = '/auth/providers'.concat('?app_id=').concat(this.#config.SSO_APP_ID);
-    return async (_req, res, next) => {
+    return async (req, res, next) => {
       try {
+        const idpUrl = this.#getIdpUrl('/auth/providers', req);
         const response = await this.#idpRequest.get(idpUrl);
         if(response.status === httpCodes.OK) {
           return res.json(response.data);
@@ -1023,8 +1035,8 @@ export class SessionManager {
    * @returns {import('@types/express').RequestHandler} Returns express Request Handler
    */
   refresh(initUser) {
-    const idpRefreshUrl = '/auth/refresh'.concat('?app_id=').concat(this.#config.SSO_APP_ID);
     return async (req, res, next) => {
+      const idpRefreshUrl = this.#getIdpUrl('/auth/refresh', req);
       const mode = this.getSessionMode() || SessionMode.SESSION;
 
       if (mode === SessionMode.TOKEN) {

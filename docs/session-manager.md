@@ -125,7 +125,7 @@ https://idp.example.com/open/api/v1
 
 The Identity Provider microservice exposes the following REST APIs that SessionManager uses internally:
 
-#### `GET /auth/providers`
+#### `GET /auth/providers?app_id={appId}`
 
 Retrieves a list of supported identity providers (e.g., Google, Azure AD, SAML, etc.).
 
@@ -138,7 +138,7 @@ Retrieves a list of supported identity providers (e.g., Google, Azure AD, SAML, 
   - `icon` - URL to provider icon for login button
   - `kind` - Theme identifier (e.g., `primary`, `secondary`)
 
-**Used by:** `identityProviders()` method
+**Used by:** `identityProviders()` method. Pass string `app_id` in the request query to override the configured `SSO_APP_ID` for this request.
 
 #### `POST /auth/login/:idp`
 
@@ -166,13 +166,13 @@ Handles the callback from the identity provider after user authentication. Valid
 
 **Used by:** `callback()` method
 
-#### `POST /auth/refresh`
+#### `POST /auth/refresh?app_id={appId}`
 
 Refreshes an expired or expiring access token without requiring the user to re-authenticate.
 
 **Purpose:** Extends user sessions seamlessly
 
-**Used by:** `refresh()` method
+**Used by:** `refresh()` method. Pass string `app_id` in the request query to override the configured `SSO_APP_ID` for this request.
 
 ### Integration with SessionManager
 
@@ -506,11 +506,13 @@ app.get('/api/profile',
   - TOKEN mode: Generates token, returns HTML page with localStorage script
 
 - **`identityProviders()`** - Get available identity providers from SSO endpoint
+  - Reads optional string `app_id` from `req.query`; empty or missing values fall back to the configured `SSO_APP_ID`
 
 - **`refresh(initUser)`** - Refresh user authentication based on SESSION_MODE
   - SESSION mode: Refreshes session data
   - TOKEN mode: Generates new token, invalidates old token
   - `initUser`: Function to transform refreshed user object
+  - Reads optional string `app_id` from `req.query`; empty or missing values fall back to the configured `SSO_APP_ID`
   - Returns: New token data (TOKEN mode) or user data (SESSION mode)
 
 - **`logout()`** - Application logout handler

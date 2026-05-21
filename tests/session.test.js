@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'mocha';
 import { expect } from 'chai';
 import sinon from 'sinon';
+import axios from 'axios';
 import { SessionManager, SessionConfig } from '../components/session.js';
 import { CustomError, httpCodes } from '../components/http-handlers.js';
 
@@ -116,6 +117,146 @@ describe('SessionManager', () => {
     it('should return null before initialization', () => {
       const manager = sessionManager.redisManager();
       expect(manager).to.be.null;
+    });
+  });
+
+  describe('identityProviders', () => {
+    let axiosCreateStub;
+    let idpRequest;
+
+    beforeEach(async () => {
+      idpRequest = {
+        get: sinon.stub().resolves({
+          status: httpCodes.OK,
+          data: [{ id: 'google', name: 'Google' }],
+        }),
+      };
+      axiosCreateStub = sinon.stub(axios, 'create').returns(idpRequest);
+      sessionManager = new SessionManager({
+        SESSION_SECRET: 'test-secret-key-for-testing',
+        SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1',
+        SSO_APP_ID: 'default-app-id',
+        SSO_JWT_SECRET: 'test-sso-secret',
+      });
+      await sessionManager.setup({
+        set: sinon.stub(),
+        use: sinon.stub(),
+      });
+    });
+
+    afterEach(() => {
+      axiosCreateStub.restore();
+    });
+
+    it('should use app_id from req.query when requesting providers', async () => {
+      const res = { json: sinon.stub() };
+      const next = sinon.stub();
+      const middleware = sessionManager.identityProviders();
+
+      await middleware({ query: { app_id: 'integration-app-id' } }, res, next);
+
+      expect(idpRequest.get.calledOnceWith('/auth/providers?app_id=integration-app-id')).to.be.true;
+      expect(res.json.calledOnceWith([{ id: 'google', name: 'Google' }])).to.be.true;
+      expect(next.called).to.be.false;
+    });
+
+    it('should fall back to configured SSO_APP_ID when appId is not provided', async () => {
+      const res = { json: sinon.stub() };
+      const next = sinon.stub();
+      const middleware = sessionManager.identityProviders();
+
+      await middleware({ query: {} }, res, next);
+
+      expect(idpRequest.get.calledOnceWith('/auth/providers?app_id=default-app-id')).to.be.true;
+      expect(res.json.calledOnceWith([{ id: 'google', name: 'Google' }])).to.be.true;
+      expect(next.called).to.be.false;
+    });
+
+    it('should fall back to configured SSO_APP_ID when query app_id is empty', async () => {
+      const res = { json: sinon.stub() };
+      const next = sinon.stub();
+      const middleware = sessionManager.identityProviders();
+
+      await middleware({ query: { app_id: '' } }, res, next);
+
+      expect(idpRequest.get.calledOnceWith('/auth/providers?app_id=default-app-id')).to.be.true;
+      expect(res.json.calledOnceWith([{ id: 'google', name: 'Google' }])).to.be.true;
+      expect(next.called).to.be.false;
+    });
+  });
+
+  describe('refresh', () => {
+    let axiosCreateStub;
+    let idpRequest;
+
+    beforeEach(async () => {
+      idpRequest = {
+        post: sinon.stub().resolves({
+          status: httpCodes.BAD_REQUEST,
+          statusText: 'Bad Request',
+        }),
+      };
+      axiosCreateStub = sinon.stub(axios, 'create').returns(idpRequest);
+      sessionManager = new SessionManager({
+        SESSION_SECRET: 'test-secret-key-for-testing',
+        SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1',
+        SSO_APP_ID: 'default-app-id',
+        SSO_JWT_SECRET: 'test-sso-secret',
+      });
+      await sessionManager.setup({
+        set: sinon.stub(),
+        use: sinon.stub(),
+      });
+    });
+
+    afterEach(() => {
+      axiosCreateStub.restore();
+    });
+
+    it('should use app_id from req.query when refreshing session', async () => {
+      const res = { json: sinon.stub() };
+      const next = sinon.stub();
+      const middleware = sessionManager.refresh((user) => user);
+      const req = {
+        query: { app_id: 'integration-app-id' },
+        sessionID: 'session-id',
+        user: {
+          email: 'test@example.com',
+          attributes: {
+            idp: 'google',
+            refresh_token: 'refresh-token',
+            expires_at: 3600,
+          },
+        },
+      };
+
+      await middleware(req, res, next);
+
+      expect(idpRequest.post.firstCall.args[0]).to.equal('/auth/refresh?app_id=integration-app-id');
+      expect(next.calledOnce).to.be.true;
+    });
+
+    it('should fall back to configured SSO_APP_ID when refresh query app_id is empty', async () => {
+      const res = { json: sinon.stub() };
+      const next = sinon.stub();
+      const middleware = sessionManager.refresh((user) => user);
+      const req = {
+        query: { app_id: '' },
+        sessionID: 'session-id',
+        user: {
+          email: 'test@example.com',
+          attributes: {
+            idp: 'google',
+            refresh_token: 'refresh-token',
+            expires_at: 3600,
+          },
+        },
+      };
+
+      await middleware(req, res, next);
+
+      expect(idpRequest.post.firstCall.args[0]).to.equal('/auth/refresh?app_id=default-app-id');
+      expect(next.calledOnce).to.be.true;
     });
   });
 
