@@ -39,11 +39,12 @@
 ```
 1.  new SessionManager(config)         // construct singleton
 2.  await session.setup(app)           // attaches express-session, opens Redis
-3.  app.get('/auth/login', ...)        // redirect to IdP (typically built from session.identityProviders())
-4.  app.get('/auth/callback', session.callback(initUser))
-5.  app.use(/* protected */, session.authenticate(), session.requireUser())
-6.  app.post('/auth/refresh', session.authenticate(), session.refresh(initUser))
-7.  app.post('/auth/logout', session.authenticate(), session.logout())
+3.  app.get('/auth/providers', session.identityProviders())
+4.  client/browser redirects to the selected provider.url returned by /auth/providers
+5.  app.get('/auth/callback', session.callback(initUser))
+6.  app.use(/* protected */, session.authenticate(), session.requireUser())
+7.  app.post('/auth/refresh', session.authenticate(), session.refresh(initUser))
+8.  app.post('/auth/logout', session.authenticate(), session.logout())
 ```
 
 ## Method semantics
@@ -67,7 +68,7 @@ Registers `express-session` (SESSION mode) and stores client setup; opens Redis 
 Force a specific verification regardless of `SESSION_MODE`. Useful for endpoints that must accept only one auth carrier (e.g., a token-only refresh endpoint in a hybrid app).
 
 ### `callback(initUser)`
-SSO-side callback. `initUser` is a synchronous transform `(user: SessionUser) => SessionUser` invoked after the IdP returns user data — use it to add fields like `displayName` or `loginTime`.
+Consumer-side callback handler. The IdP redirects back to this route with `?jwt=...`; `SessionManager` decrypts that JWT locally and then calls `initUser`, a synchronous transform `(user: SessionUser) => SessionUser` you can use to add fields like `displayName` or `loginTime`.
 - SESSION: writes `req.session[SESSION_KEY] = transformedUser`, then redirects to `payload.redirect_url || SSO_SUCCESS_URL`.
 - TOKEN: encrypts a JWT, stores user in Redis at `{SESSION_KEY}:{email}:{tid}`, returns an HTML page that writes the token to `localStorage[SESSION_KEY]` and the expiry to `localStorage[SESSION_EXPIRY_KEY]`, then redirects to `payload.redirect_url || SSO_SUCCESS_URL`.
 
@@ -83,7 +84,9 @@ Reads query params:
 For custom flows. Throws `CustomError(401)` if not authenticated. `includeUserData` toggles whether to fetch from session/Redis vs. return only the auth payload.
 
 ### `identityProviders()`
-Proxy to `GET {SSO_ENDPOINT_URL}/auth/providers?app_id=...`. The `app_id` query value comes from `req.query.app_id` and falls back to `SSO_APP_ID`. Use it to render a login button list, including multi-tenant/provider-selector screens.
+Proxy to `GET {SSO_ENDPOINT_URL}/auth/providers?app_id=...`. The `app_id` query value comes from `req.query.app_id` and falls back to `SSO_APP_ID`. Use it to render a login button list, including multi-tenant/provider-selector screens. Each returned provider includes the login `url`; redirect the browser/client to that URL to start login.
+
+There is no public `SessionManager.login()` middleware. Do not add a custom Express route that calls Axios `POST /auth/login/:idp`; it bypasses the `identityProviders()` contract and can lose the request-level `app_id` selection.
 
 ## Redis key patterns (TOKEN mode)
 

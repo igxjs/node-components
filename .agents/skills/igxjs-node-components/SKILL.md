@@ -60,7 +60,7 @@ Pick the component(s) the user needs and read the matching reference file before
 |-----------|-----------|-----------|
 | SSO login + protected routes (cookie) | `SessionManager` (SESSION mode) | [references/session-manager.md](references/session-manager.md) |
 | SSO login + protected routes (SPA / mobile / API) | `SessionManager` (TOKEN mode) | [references/session-manager.md](references/session-manager.md) |
-| Mount routers under `/api/v1`, share middleware | `FlexRouter` | [references/flex-router.md](references/flex-router.md) |
+| Export feature route modules and mount them under `/api/v1` with shared middleware | `FlexRouter` | [references/flex-router.md](references/flex-router.md) |
 | Encrypt/decrypt JWE tokens (not SSO) | `JwtManager` | [references/jwt-manager.md](references/jwt-manager.md) |
 | Direct Redis access with TLS / reconnection | `RedisManager` | [references/redis-manager.md](references/redis-manager.md) |
 | 404 + standardized error responses | `httpError*`, `CustomError`, `httpCodes`, `httpHelper` | [references/http-handlers.md](references/http-handlers.md) |
@@ -87,6 +87,24 @@ app.get('/protected', session.authenticate(), session.requireUser(), handler);
 
 Routes registered before `setup()` resolves will not have session middleware attached.
 
+### `FlexRouter` belongs with the route module, not inline in the entry file
+
+`FlexRouter` is meant to let each feature module export its own mountable router definitions. In the Node entry file (`app.js`, `server.js`, etc.), import those arrays and mount them in a loop; do not put a collection of ad hoc `new FlexRouter(...)` declarations directly in the entry file unless you are only writing a tiny throwaway example.
+
+```javascript
+// features/users/routes.js
+export const routers = [
+  new FlexRouter('/users', usersRouter, [session.authenticate(), session.requireUser()]),
+];
+
+// app.js
+for (const router of [...userRouters, ...orderRouters]) {
+  router.mount(app, '/api/v1');
+}
+```
+
+For CommonJS route modules in environments that can load the package synchronously, use `module.exports = { routers: [...] }`. If the consumer is CommonJS on Node 18-22.11, follow the import guidance above and create the routers after the dynamic `import('@igxjs/node-components')` resolves.
+
 ### `authenticate()` and `requireUser()` are separate steps
 
 `authenticate()` only verifies the session/token is valid; it does **not** populate `req.user`. To get the user object in the handler, chain `requireUser()` after it. Calling `requireUser()` alone is wrong — it requires authentication state to already exist on the request.
@@ -95,9 +113,11 @@ Routes registered before `setup()` resolves will not have session middleware att
 
 If `SESSION_MODE: SessionMode.TOKEN`, the consumer must set `REDIS_URL`, `SSO_SUCCESS_URL`, and `SSO_FAILURE_URL`. Memory store is not supported in TOKEN mode. Token user data is stored in Redis under `{SESSION_KEY}:{email}:{tid}`; `SESSION_PREFIX` is used by the express-session Redis store, not by TOKEN-mode token keys.
 
-### `identityProviders()` and `refresh()` can use request-level `app_id`
+### Use `identityProviders()` for login URLs; do not invent `login()` middleware
 
-Both methods read an optional string `req.query.app_id` and fall back to `SSO_APP_ID` when it is empty or missing. Use this when one Express app integrates multiple IdP app registrations:
+`SessionManager` does not expose a `login()` method. Do not generate code that adds an Express login middleware which calls Axios `POST /auth/login/:idp`; that duplicates the IdP contract and is easy to get wrong. The login entry point is `identityProviders()`: it proxies `GET /auth/providers?app_id=...`, and each provider object includes the login `url` that the browser/client should redirect to.
+
+`identityProviders()` and `refresh()` both read an optional string `req.query.app_id` and fall back to `SSO_APP_ID` when it is empty or missing. Use this when one Express app integrates multiple IdP app registrations:
 
 ```javascript
 app.get('/auth/providers', session.identityProviders()); // /auth/providers?app_id=tenant-a
@@ -129,9 +149,9 @@ A typical "SSO + protected API" integration looks like this. Copy from [examples
 1. Add an Identity Provider microservice URL to env (`SSO_ENDPOINT_URL`) — consult [references/identity-provider.md](references/identity-provider.md) if the user asks what endpoints that service must expose.
 2. Create `config/session-manager.js` with the singleton (see [examples/session-mode.js](examples/session-mode.js) or [examples/token-mode.js](examples/token-mode.js)).
 3. In `app.js`: `await session.setup(app)` before defining routes.
-4. Wire `session.identityProviders()`, `session.callback()`, `session.refresh()`, `session.logout()` to your auth routes.
+4. Wire `session.identityProviders()`, `session.callback()`, `session.refresh()`, `session.logout()` to your auth routes. For login, render or redirect to the `url` returned by `identityProviders()`; do not add a custom Axios call to `/auth/login/:idp`.
 5. Protect routes with `session.authenticate()` + `session.requireUser()`.
-6. Mount feature routers via `FlexRouter` if the project versions APIs under context paths.
+6. Put `FlexRouter` definitions in feature route modules that export `routers` arrays, then mount those arrays from the app entry.
 7. Add `httpNotFoundHandler` then `httpErrorHandler` last.
 
 The complete wiring is shown in [examples/full-app.js](examples/full-app.js).
@@ -150,7 +170,8 @@ Working integration snippets are in `examples/`:
 - [examples/install.sh](examples/install.sh) — install + `.npmrc` setup
 - [examples/session-mode.js](examples/session-mode.js) — minimal SESSION-mode singleton + app
 - [examples/token-mode.js](examples/token-mode.js) — minimal TOKEN-mode singleton + app
-- [examples/full-app.js](examples/full-app.js) — SessionManager + FlexRouter + httpErrorHandler wired end-to-end
+- [examples/full-app.js](examples/full-app.js) — app entry that mounts feature-exported FlexRouter arrays
+- [examples/routes.js](examples/routes.js) and [examples/features/*/routes.js](examples/features/users/routes.js) — feature-module `routers` export pattern
 - [examples/jwt-standalone.js](examples/jwt-standalone.js) — `JwtManager` for non-SSO token flows
 - [examples/error-handler.js](examples/error-handler.js) — error middleware + Axios error conversion; install `zod` if copying the validation example
 

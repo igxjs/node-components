@@ -3,8 +3,8 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "In an Express ESM app, integrate @igxjs/node-components SessionManager in SESSION mode. I need /auth/providers, /auth/callback, /auth/refresh, /auth/logout, and /api/profile. The app may receive /auth/providers?app_id=tenant-a and /auth/refresh?app_id=tenant-a.",
-      "expected_output": "Shows a singleton SessionManager, awaits setup before routes, wires identityProviders/callback/refresh/logout, protects /api/profile with authenticate + requireUser, and explains app_id query fallback to SSO_APP_ID.",
+      "prompt": "In an Express ESM app, integrate @igxjs/node-components SessionManager in SESSION mode. I need /auth/providers, /auth/callback, /auth/refresh, /auth/logout, and /api/profile. The app may receive /auth/providers?app_id=tenant-a and /auth/refresh?app_id=tenant-a. For login, the UI should use the provider URL returned by /auth/providers.",
+      "expected_output": "Shows a singleton SessionManager, awaits setup before routes, wires identityProviders/callback/refresh/logout, protects /api/profile with authenticate + requireUser, explains app_id query fallback to SSO_APP_ID, and does not create a custom login middleware or Axios POST to /auth/login/:idp.",
       "files": []
     },
     {
@@ -23,6 +23,12 @@
       "id": 4,
       "prompt": "My service is CommonJS on Node 20 and I need to use JwtManager from @igxjs/node-components for password reset links. Give me the right import style and a secure JWE example.",
       "expected_output": "Uses dynamic import rather than require for Node 20 CommonJS, creates JwtManager with JWT_* constructor options, uses camelCase per-call options, uses a separate secret from SSO/session secrets, and decrypts with subject validation.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Refactor my Express app to use FlexRouter. I have users and orders routers, and I want each feature router file to export its mount definitions instead of putting all new FlexRouter calls in app.js. Show both the feature file shape and the app.js mounting loop.",
+      "expected_output": "Defines `export const routers = [new FlexRouter(...)]` inside each feature route module, keeps app.js limited to importing/combining those arrays and calling mount(app, basePath), and avoids declaring all FlexRouter instances inline in the entry file.",
       "files": []
     }
   ]
