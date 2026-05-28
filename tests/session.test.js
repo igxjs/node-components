@@ -260,6 +260,35 @@ describe('SessionManager', () => {
       expect(idpRequest.post.firstCall.args[0]).to.equal('/auth/refresh?app_id=default-app-id');
       expect(next.calledOnce).to.be.true;
     });
+
+    it('should preserve CONFLICT status when session refresh is locked', async () => {
+      const res = { json: sinon.stub() };
+      const next = sinon.stub();
+      const middleware = sessionManager.refresh((user) => user);
+      const req = {
+        query: {},
+        sessionID: 'session-id',
+        user: {
+          email: 'test@example.com',
+          attributes: {
+            idp: 'google',
+            refresh_token: 'refresh-token',
+            expires_at: 3600,
+          },
+        },
+      };
+
+      sessionManager.lock('test@example.com');
+
+      await middleware(req, res, next);
+
+      expect(idpRequest.post.called).to.be.false;
+      expect(next.calledOnce).to.be.true;
+      const error = next.firstCall.args[0];
+      expect(error).to.be.instanceOf(CustomError);
+      expect(error.code).to.equal(httpCodes.CONFLICT);
+      expect(error.message).to.equal('Session refresh is locked');
+    });
   });
 
   describe('callback', () => {

@@ -681,6 +681,9 @@ export class SessionManager {
       // Return new token
       return res.json({ jwt: newToken, user: newUser });
     } catch (error) {
+      if (error instanceof CustomError) {
+        return next(error);
+      }
       return next(httpHelper.handleAxiosError(error));
     }
   }
@@ -724,6 +727,9 @@ export class SessionManager {
       }
       throw new CustomError(response.status, response.statusText);
     } catch (error) {
+      if (error instanceof CustomError) {
+        return next(error);
+      }
       return next(httpHelper.handleAxiosError(error));
     }
   }
