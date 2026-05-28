@@ -24,23 +24,90 @@ export const SessionMode = {
   TOKEN: 'token'
 };
 
+const CHARACTER_CODES = Object.freeze({
+  BACKSLASH: 0x5C,
+  SINGLE_QUOTE: 0x27,
+  DOUBLE_QUOTE: 0x22,
+  LINE_FEED: 0x0A,
+  CARRIAGE_RETURN: 0x0D,
+  LINE_SEPARATOR: 0x2028,
+  PARAGRAPH_SEPARATOR: 0x2029,
+  LESS_THAN: 0x3C,
+  GREATER_THAN: 0x3E,
+  AMPERSAND: 0x26,
+  GRAVE_ACCENT: 0x60,
+});
+
+const BACKSLASH_CHARACTER = String.fromCodePoint(CHARACTER_CODES.BACKSLASH);
+
+const JS_STRING_ESCAPE_CODES = new Set([
+  CHARACTER_CODES.BACKSLASH,
+  CHARACTER_CODES.SINGLE_QUOTE,
+  CHARACTER_CODES.DOUBLE_QUOTE,
+  CHARACTER_CODES.LINE_FEED,
+  CHARACTER_CODES.CARRIAGE_RETURN,
+  CHARACTER_CODES.LINE_SEPARATOR,
+  CHARACTER_CODES.PARAGRAPH_SEPARATOR,
+  CHARACTER_CODES.LESS_THAN,
+  CHARACTER_CODES.GREATER_THAN,
+  CHARACTER_CODES.AMPERSAND,
+]);
+
+const URL_PLACEHOLDER_ESCAPE_CODES = new Set([
+  CHARACTER_CODES.BACKSLASH,
+  CHARACTER_CODES.SINGLE_QUOTE,
+  CHARACTER_CODES.DOUBLE_QUOTE,
+  CHARACTER_CODES.LESS_THAN,
+  CHARACTER_CODES.GREATER_THAN,
+  CHARACTER_CODES.GRAVE_ACCENT,
+  CHARACTER_CODES.LINE_FEED,
+  CHARACTER_CODES.CARRIAGE_RETURN,
+  CHARACTER_CODES.LINE_SEPARATOR,
+  CHARACTER_CODES.PARAGRAPH_SEPARATOR,
+]);
+
+const toHex = (codePoint, minLength = 2) =>
+  codePoint.toString(16).padStart(minLength, '0');
+
+const escapeJsCodePoint = (codePoint) => {
+  switch (codePoint) {
+    case CHARACTER_CODES.BACKSLASH:
+      return BACKSLASH_CHARACTER.repeat(2);
+    case CHARACTER_CODES.SINGLE_QUOTE:
+    case CHARACTER_CODES.DOUBLE_QUOTE:
+      return `${BACKSLASH_CHARACTER}${String.fromCodePoint(codePoint)}`;
+    case CHARACTER_CODES.LINE_FEED:
+      return `${BACKSLASH_CHARACTER}n`;
+    case CHARACTER_CODES.CARRIAGE_RETURN:
+      return `${BACKSLASH_CHARACTER}r`;
+    case CHARACTER_CODES.LINE_SEPARATOR:
+    case CHARACTER_CODES.PARAGRAPH_SEPARATOR:
+      return `${BACKSLASH_CHARACTER}u${toHex(codePoint, 4)}`;
+    default:
+      return `${BACKSLASH_CHARACTER}x${toHex(codePoint)}`;
+  }
+};
+
+const percentEncodeCodePoint = (codePoint) => {
+  const character = String.fromCodePoint(codePoint);
+  const encoded = encodeURIComponent(character);
+  return encoded === character ? `%${toHex(codePoint).toUpperCase()}` : encoded;
+};
+
+const escapeSelectedCharacters = (value, escapeCodes, escapeCodePoint) =>
+  Array.from(String(value), (character) => {
+    const codePoint = character.codePointAt(0);
+    return escapeCodes.has(codePoint) ? escapeCodePoint(codePoint) : character;
+  }).join('');
+
 /**
  * Escape a value for safe interpolation inside a single-quoted JS string
  * literal (e.g. `'{{PLACEHOLDER}}'`). Also blocks `</script>` breakout.
  * @param {string} value
  * @returns {string}
  */
-const escapeJsString = (value) => String(value)
-  .replaceAll('\\', '\\\\')
-  .replaceAll("'", "\\'")
-  .replaceAll('"', '\\"')
-  .replaceAll('\n', '\\n')
-  .replaceAll('\r', '\\r')
-  .replaceAll(' ', '\\u2028')
-  .replaceAll(' ', '\\u2029')
-  .replaceAll('<', '\\x3c')
-  .replaceAll('>', '\\x3e')
-  .replaceAll('&', '\\x26');
+const escapeJsString = (value) =>
+  escapeSelectedCharacters(value, JS_STRING_ESCAPE_CODES, escapeJsCodePoint);
 
 /**
  * Escape a URL placeholder so it is safe in both HTML attribute and JS string
@@ -50,17 +117,8 @@ const escapeJsString = (value) => String(value)
  * @param {string} value
  * @returns {string}
  */
-const escapeUrlPlaceholder = (value) => String(value)
-  .replaceAll('\\', '%5C')
-  .replaceAll("'", '%27')
-  .replaceAll('"', '%22')
-  .replaceAll('<', '%3C')
-  .replaceAll('>', '%3E')
-  .replaceAll('`', '%60')
-  .replaceAll('\n', '%0A')
-  .replaceAll('\r', '%0D')
-  .replaceAll(' ', '%E2%80%A8')
-  .replaceAll(' ', '%E2%80%A9');
+const escapeUrlPlaceholder = (value) =>
+  escapeSelectedCharacters(value, URL_PLACEHOLDER_ESCAPE_CODES, percentEncodeCodePoint);
 
 /**
  * Session configuration options
@@ -954,7 +1012,14 @@ export class SessionManager {
    * @returns {string} Failure redirect URL
    */
   #getFailureRedirectUrl(reason = '') {
-    return this.#config.SSO_FAILURE_URL.concat('?reason=').concat(encodeURIComponent(reason));
+    const failureUrl = this.#config.SSO_FAILURE_URL;
+    const hashIndex = failureUrl.indexOf('#');
+    const baseUrl = hashIndex === -1 ? failureUrl : failureUrl.slice(0, hashIndex);
+    const hash = hashIndex === -1 ? '' : failureUrl.slice(hashIndex);
+    const separator = baseUrl.includes('?')
+      ? (baseUrl.endsWith('?') || baseUrl.endsWith('&') ? '' : '&')
+      : '?';
+    return `${baseUrl}${separator}reason=${encodeURIComponent(reason)}${hash}`;
   }
 
   /**

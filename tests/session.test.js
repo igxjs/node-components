@@ -4,6 +4,8 @@ import sinon from 'sinon';
 import axios from 'axios';
 import { SessionManager, SessionConfig } from '../components/session.js';
 import { CustomError, httpCodes } from '../components/http-handlers.js';
+import { JwtManager } from '../components/jwt.js';
+import { RedisManager } from '../components/redis.js';
 
 describe('SessionManager', () => {
   let sessionManager;
@@ -257,6 +259,105 @@ describe('SessionManager', () => {
 
       expect(idpRequest.post.firstCall.args[0]).to.equal('/auth/refresh?app_id=default-app-id');
       expect(next.calledOnce).to.be.true;
+    });
+  });
+
+  describe('callback', () => {
+    let redisConnectStub;
+    let redisGetClientStub;
+
+    afterEach(() => {
+      redisConnectStub?.restore();
+      redisGetClientStub?.restore();
+    });
+
+    it('should append failure reason with ampersand when SSO_FAILURE_URL already has query params', async () => {
+      const token = await new JwtManager().encrypt({
+        user: {
+          email: 'test@example.com',
+          authorized: true,
+          attributes: {
+            expires_at: 3600,
+          },
+        },
+      }, 'correct-sso-secret');
+
+      sessionManager = new SessionManager({
+        SESSION_SECRET: 'test-secret-key-for-testing',
+        SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1',
+        SSO_APP_ID: 'default-app-id',
+        SSO_JWT_SECRET: 'wrong-sso-secret',
+        SSO_FAILURE_URL: '/login?error=unauthorized',
+      });
+      await sessionManager.setup({
+        set: sinon.stub(),
+        use: sinon.stub(),
+      });
+
+      const res = { redirect: sinon.stub() };
+      const next = sinon.stub();
+      const middleware = sessionManager.callback((user) => user);
+
+      await middleware({ query: { jwt: token } }, res, next);
+
+      expect(res.redirect.calledOnce).to.be.true;
+      expect(res.redirect.firstCall.args[0]).to.match(/^\/login\?error=unauthorized&reason=/);
+      expect(res.redirect.firstCall.args[0]).not.to.include('unauthorized?reason=');
+      expect(next.called).to.be.false;
+    });
+
+    it('should escape token storage HTML placeholders for script and href contexts', async () => {
+      const redisClient = {
+        setEx: sinon.stub().resolves('OK'),
+      };
+      redisConnectStub = sinon.stub(RedisManager.prototype, 'connect').resolves(true);
+      redisGetClientStub = sinon.stub(RedisManager.prototype, 'getClient').returns(redisClient);
+
+      const injectionValue = "value'</script><img src=x onerror=alert(1)>&\n";
+      const successUrl = "https://app.example.com/callback?next='\"><script>alert(1)</script>`\\\n&ok=1";
+      const failureUrl = "https://app.example.com/login?error='\"><script>alert(2)</script>`\\\n&retry=1";
+      const token = await new JwtManager().encrypt({
+        user: {
+          email: 'test@example.com',
+          authorized: true,
+          attributes: {
+            expires_at: injectionValue,
+          },
+        },
+      }, 'test-sso-secret');
+
+      sessionManager = new SessionManager({
+        SESSION_SECRET: 'test-secret-key-for-testing',
+        SESSION_MODE: 'token',
+        SESSION_KEY: injectionValue,
+        SESSION_EXPIRY_KEY: injectionValue,
+        SSO_ENDPOINT_URL: 'https://idp.example.com/open/api/v1',
+        SSO_APP_ID: 'default-app-id',
+        SSO_JWT_SECRET: 'test-sso-secret',
+        SSO_SUCCESS_URL: successUrl,
+        SSO_FAILURE_URL: failureUrl,
+      });
+      await sessionManager.setup({
+        set: sinon.stub(),
+        use: sinon.stub(),
+      });
+
+      const res = { send: sinon.stub() };
+      const next = sinon.stub();
+      const middleware = sessionManager.callback((user) => user);
+
+      await middleware({ query: { jwt: token } }, res, next);
+
+      const html = res.send.firstCall.args[0];
+      expect(res.send.calledOnce).to.be.true;
+      expect(redisClient.setEx.calledOnce).to.be.true;
+      expect(html).to.include("value\\'\\x3c/script\\x3e\\x3cimg src=x onerror=alert(1)\\x3e\\x26\\n");
+      expect(html).to.include("next=%27%22%3E%3Cscript%3Ealert(1)%3C/script%3E%60%5C%0A&ok=1");
+      expect(html).to.include("error=%27%22%3E%3Cscript%3Ealert(2)%3C/script%3E%60%5C%0A&retry=1");
+      expect(html).not.to.include(injectionValue);
+      expect(html).not.to.include('<script>alert(1)</script>');
+      expect(html).not.to.include('</script><img');
+      expect(next.called).to.be.false;
     });
   });
 
