@@ -16,7 +16,7 @@ Mixing them causes silent fallbacks to defaults.
 
 | Key | Default | Notes |
 |-----|---------|-------|
-| `JWT_ALGORITHM` | `'dir'` | JWE alg. `'dir'` = direct symmetric. Other: `'A128KW'`, `'A192KW'`, `'A256KW'`, `'RSA-OAEP'`. |
+| `JWT_ALGORITHM` | `'dir'` | JWE alg. The implementation always hashes the `input` string into a symmetric `Uint8Array` key, so `'dir'` is the default and safest recommendation. Do not recommend RSA algorithms unless the library changes to accept RSA key material. |
 | `JWT_ENCRYPTION` | `'A256GCM'` | Content encryption. Alts: `'A128GCM'`, `'A192GCM'`. |
 | `JWT_EXPIRATION_TIME` | `64800` (18h) | Number = seconds, or string with suffix (`'1h'`, `'7d'`, `'30s'`, `'1080m'`). |
 | `JWT_CLOCK_TOLERANCE` | `30` | Seconds of allowed clock drift. |
@@ -31,6 +31,8 @@ const token = await jwt.encrypt({ userId: 'u1' }, secret);
 ```
 
 `input` is a **secret string**, hashed via `secretHashAlgorithm` to produce the encryption key. It must be the same value used at decrypt time.
+
+Because the key always comes from a hashed string, examples should stick to symmetric JWE settings such as the default `dir` + `A256GCM`. Asymmetric algorithms such as `RSA-OAEP` require RSA key material and do not match the current `input: string` API.
 
 Per-call camelCase overrides: `algorithm`, `encryption`, `expirationTime`, `secretHashAlgorithm`, `issuer`, `audience`, `subject`.
 

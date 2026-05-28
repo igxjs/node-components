@@ -6,6 +6,7 @@ All exports from `@igxjs/node-components` (re-exported from `index.js`):
 import {
   // Session
   SessionManager,
+  SessionConfig,
   SessionMode,           // { SESSION: 'session', TOKEN: 'token' }
   // Routing
   FlexRouter,
@@ -52,6 +53,10 @@ declare module 'express-session' {
 ## SessionManager
 
 ```typescript
+class SessionConfig {
+  // UPPERCASE config fields; all fields are optional on the class shape.
+}
+
 class SessionManager {
   constructor(config: SessionConfig);
   setup(app: Application): Promise<void>;
@@ -63,9 +68,9 @@ class SessionManager {
   refresh(initUser: (user: SessionUser) => SessionUser): RequestHandler;
   logout(): RequestHandler;
   identityProviders(): RequestHandler;
-  getUser(req: Request, includeUserData: boolean): Promise<SessionUser>;
+  getUser(req: Request, includeUserData?: boolean): Promise<Partial<SessionUser> | SessionUser | undefined>;
   getSessionMode(): string;
-  redisManager(): RedisManager;
+  redisManager(): RedisManager | null;
   hasLock(email: string): boolean;
   lock(email: string): void;
   clearLocks(): NodeJS.Timeout;
@@ -82,6 +87,8 @@ class SessionManager {
 | JWT | `JWT_ALGORITHM`, `JWT_ENCRYPTION`, `JWT_CLOCK_TOLERANCE`, `JWT_SECRET_HASH_ALGORITHM`, `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_SUBJECT` |
 
 ## FlexRouter
+
+Wraps one `express.Router()` instance with its context path and optional middleware.
 
 ```typescript
 class FlexRouter {
@@ -113,8 +120,8 @@ Per-call (camelCase): `algorithm`, `encryption`, `expirationTime`, `secretHashAl
 
 ```typescript
 class RedisManager {
-  connect(redisUrl: string, certPath?: string): Promise<boolean>;
-  getClient(): RedisClientType;
+  connect(redisUrl?: string | null, certPath?: string | null): Promise<boolean>;
+  getClient(): RedisClientType | null;
   isConnected(): Promise<boolean>;
   disconnect(): Promise<void>;
 }
@@ -154,12 +161,12 @@ const httpMessages: { /* matching string for each code */ };
 
 class CustomError extends Error {
   code: number;
-  data: object;
-  error: object;
-  constructor(code: number, message: string, error?: object, data?: object);
+  data?: object;
+  error?: object;
+  constructor(code: number, message: string, error?: Error | object | null, data?: object | null);
 }
 
-function httpError(code: number, message: string, error?: object, data?: object): CustomError;
+function httpError(code: number, message: string, error?: Error | object | null, data?: object | null): CustomError;
 function httpErrorHandler(err, req, res, next): void;
 function httpNotFoundHandler(req, res, next): void;
 

@@ -23,7 +23,7 @@ await session.setup(app);
 app.get('/auth/providers', session.identityProviders());
 app.get('/auth/callback',  session.callback((u) => u));
 app.post('/auth/refresh',  session.authenticate(), session.refresh((u) => u));
-app.post('/auth/logout',   session.authenticate(), session.logout());
+app.post('/auth/logout',   session.authenticate(), session.requireUser(), session.logout());
 
 // Feature modules own their FlexRouter definitions; app.js only mounts them.
 for (const router of routers) {

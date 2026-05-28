@@ -40,7 +40,7 @@ app.get('/auth/callback',  session.callback((user) => ({
 
 // Refresh and logout
 // Optional query override: /auth/refresh?app_id=tenant-a
-app.post('/auth/refresh', session.authenticate(), session.refresh((user) => ({
+app.post('/auth/refresh', session.authenticate(), session.requireUser(), session.refresh((user) => ({
   ...user,
   refreshedAt: new Date(),
 })));

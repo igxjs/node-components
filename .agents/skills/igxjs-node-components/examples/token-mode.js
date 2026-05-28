@@ -59,7 +59,7 @@ app.post('/api/auth/refresh',
 );
 
 // Logout current device, or `?all=true` for all devices
-app.post('/api/auth/logout', session.authenticate(), session.logout());
+app.post('/api/auth/logout', session.authenticate(), session.requireUser(), session.logout());
 
 app.use(httpNotFoundHandler);
 app.use(httpErrorHandler);

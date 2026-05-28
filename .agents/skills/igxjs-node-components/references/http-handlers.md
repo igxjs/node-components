@@ -121,4 +121,4 @@ Positional `{n}` placeholders. Use it when building error messages from translat
 
 - `httpErrorHandler` accepts both `CustomError` and any other thrown error; generic errors without a `code` field render as `400 BAD_REQUEST` with the original message.
 - The handler does not stack-trace unless the underlying error is logged. For dev visibility, your own request logger should log before `httpErrorHandler`.
-- `httpCodes.LOCKED` (423) is used by `SessionManager` when refresh locks are active — surface it to clients as a retryable error.
+- `SessionManager` uses `httpCodes.CONFLICT` (409) when refresh locks are active. `httpCodes.LOCKED` (423) is exported but is not currently used by `SessionManager`.

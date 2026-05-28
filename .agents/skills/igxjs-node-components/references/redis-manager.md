@@ -28,7 +28,7 @@ rediss://user:password@host:6380             // TLS with auth
 
 ## Sharing the client with SessionManager
 
-`SessionManager.redisManager()` returns the manager it constructed internally (or `null` if `REDIS_URL` was not configured). To reuse that connection for application data:
+`SessionManager.redisManager()` returns `null` before `setup(app)` runs. After setup it returns the manager constructed internally; if `REDIS_URL` was missing or connection failed, `getClient()` can still be `null`. To reuse an established connection for application data:
 
 ```javascript
 const client = session.redisManager()?.getClient();
@@ -60,7 +60,7 @@ Connection drops are handled by the underlying client; `RedisManager` ensures th
 
 ## Cleanup
 
-Call `disconnect()` on graceful shutdown to flush in-flight commands and close the socket cleanly:
+Call `disconnect()` on graceful shutdown after a successful connection to flush in-flight commands and close the socket cleanly:
 
 ```javascript
 process.on('SIGTERM', async () => {

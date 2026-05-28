@@ -1,6 +1,8 @@
 # FlexRouter Reference
 
-A thin wrapper around `express.Router()` that bundles a context path with shared middleware and exposes a single `mount(app, basePath)` call. Treat `FlexRouter` as a route-module export format: each feature module owns its `new FlexRouter(...)` definitions, and the app entry only imports and mounts those exported definitions.
+A thin one-to-one wrapper around a single `express.Router()` instance. It bundles that router's context path with optional router-specific middleware and exposes a single `mount(app, basePath)` call.
+
+Use one `FlexRouter` per Express router. A module may export many `FlexRouter` entries, but each entry should wrap exactly one `express.Router()` instance.
 
 ## Constructor
 
@@ -8,8 +10,8 @@ A thin wrapper around `express.Router()` that bundles a context path with shared
 new FlexRouter(context, router, handlers?)
 ```
 
-- `context` (string): path prepended to every route (e.g., `/api/v1`).
-- `router` (`express.Router` instance): your route definitions.
+- `context` (string): router-specific mount path, prepended to every route it owns (e.g., `/public` or `/users`).
+- `router` (`express.Router` instance): one Express router instance containing this route group.
 - `handlers` (RequestHandler[], optional): middlewares applied in order before any route in this router.
 
 ## mount(app, basePath)
@@ -17,27 +19,32 @@ new FlexRouter(context, router, handlers?)
 Final route path is `basePath + context + routePath`.
 
 ```javascript
-const r = new FlexRouter('/api', userRouter);
-r.mount(app, '/v1');           // /v1/api/...
-r.mount(app, '');              // /api/...
-r.mount(app, '/tenant/:id');   // /tenant/:id/api/...
+const r = new FlexRouter('/users', userRouter);
+r.mount(app, '/api/v1');       // /api/v1/users/...
+
+const tenantRouter = new FlexRouter('/users', userRouter);
+tenantRouter.mount(app, '/tenant/:id/api/v1'); // /tenant/:id/api/v1/users/...
 ```
 
-## Preferred module pattern
+## Module pattern
 
-Use `routers` arrays from feature modules. This keeps route ownership near the route definitions and keeps `app.js` focused on application setup.
+Use `routers` arrays from route modules. This keeps route ownership near the route definitions and keeps `app.js` focused on application setup. If a file declares multiple Express routers, export one `FlexRouter` entry for each router.
 
 ```javascript
-// features/users/routes.js
+// features/api/routes.js
 import { Router } from 'express';
 import { FlexRouter } from '@igxjs/node-components';
 import { session } from '../../config/session-manager.js';
 
-const usersRouter = Router();
-usersRouter.get('/me', (req, res) => res.json({ user: req.user }));
+const publicRouter = Router();
+const privateRouter = Router();
+
+publicRouter.get('/health', (_req, res) => res.json({ ok: true }));
+privateRouter.get('/me', (req, res) => res.json({ user: req.user }));
 
 export const routers = [
-  new FlexRouter('/users', usersRouter, [
+  new FlexRouter('/public', publicRouter),
+  new FlexRouter('/protected', privateRouter, [
     session.authenticate(),
     session.requireUser(),
   ]),
@@ -46,10 +53,9 @@ export const routers = [
 
 ```javascript
 // app.js
-import { routers as userRouters } from './features/users/routes.js';
-import { routers as orderRouters } from './features/orders/routes.js';
+import { routers as apiRouters } from './features/api/routes.js';
 
-for (const router of [...userRouters, ...orderRouters]) {
+for (const router of apiRouters) {
   router.mount(app, '/api/v1');
 }
 ```
@@ -97,6 +103,7 @@ export const routers = [
 
 ## Notes
 
-- Avoid placing all `new FlexRouter(...)` declarations directly in `app.js`; that makes feature route ownership unclear and leads to duplicated context paths as the app grows.
+- `mount(app, basePath)` always concatenates `basePath + context`; prefer a real shared prefix such as `mount(app, '/api/v1')` when one exists. Use `mount(app, '')` only when there is intentionally no shared prefix.
+- Avoid creating a single `FlexRouter` for multiple Express routers. If middleware differs between public and protected routes, use separate Express routers and separate `FlexRouter` entries.
 - Middleware in `handlers` runs before any route matches; it does not run on unmatched paths within the context. Place global middleware (body parsers, request loggers) on `app` directly, not in `FlexRouter`.
 - `FlexRouter` does not implement nesting. To nest, mount one router inside another using vanilla `express.Router` and pass the outer router to `FlexRouter`.

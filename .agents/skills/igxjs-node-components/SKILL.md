@@ -60,7 +60,7 @@ Pick the component(s) the user needs and read the matching reference file before
 |-----------|-----------|-----------|
 | SSO login + protected routes (cookie) | `SessionManager` (SESSION mode) | [references/session-manager.md](references/session-manager.md) |
 | SSO login + protected routes (SPA / mobile / API) | `SessionManager` (TOKEN mode) | [references/session-manager.md](references/session-manager.md) |
-| Export feature route modules and mount them under `/api/v1` with shared middleware | `FlexRouter` | [references/flex-router.md](references/flex-router.md) |
+| Mount one or more `express.Router()` instances with router-specific context paths and middleware | `FlexRouter` | [references/flex-router.md](references/flex-router.md) |
 | Encrypt/decrypt JWE tokens (not SSO) | `JwtManager` | [references/jwt-manager.md](references/jwt-manager.md) |
 | Direct Redis access with TLS / reconnection | `RedisManager` | [references/redis-manager.md](references/redis-manager.md) |
 | 404 + standardized error responses | `httpError*`, `CustomError`, `httpCodes`, `httpHelper` | [references/http-handlers.md](references/http-handlers.md) |
@@ -87,27 +87,41 @@ app.get('/protected', session.authenticate(), session.requireUser(), handler);
 
 Routes registered before `setup()` resolves will not have session middleware attached.
 
-### `FlexRouter` belongs with the route module, not inline in the entry file
+### `FlexRouter` wraps one Express router at a time
 
-`FlexRouter` is meant to let each feature module export its own mountable router definitions. In the Node entry file (`app.js`, `server.js`, etc.), import those arrays and mount them in a loop; do not put a collection of ad hoc `new FlexRouter(...)` declarations directly in the entry file unless you are only writing a tiny throwaway example.
+Follow `components/router.js`: create an `express.Router()`, define routes on it, then create one `new FlexRouter(context, router, handlers?)` for that exact router. If a module has separate public and protected routers, export two `FlexRouter` entries. Do not use one `FlexRouter` as an aggregate for multiple Express routers, and do not put public and protected routes into the same Express router when they need different middleware.
+
+`mount(app, basePath)` concatenates `basePath + context`. Prefer putting shared prefixes such as `/api/v1` in `basePath`, and keep each `FlexRouter` context focused on the router-specific path such as `/public` or `/protected`. Pass an empty `basePath` only when there is intentionally no shared prefix.
 
 ```javascript
-// features/users/routes.js
+// features/api/routes.js
+const publicRouter = Router();
+const privateRouter = Router();
+
+publicRouter.get('/health', healthHandler);
+privateRouter.get('/me', profileHandler);
+
 export const routers = [
-  new FlexRouter('/users', usersRouter, [session.authenticate(), session.requireUser()]),
+  new FlexRouter('/public', publicRouter),
+  new FlexRouter('/protected', privateRouter, [
+    session.authenticate(),
+    session.requireUser(),
+  ]),
 ];
 
 // app.js
-for (const router of [...userRouters, ...orderRouters]) {
+for (const router of routers) {
   router.mount(app, '/api/v1');
 }
 ```
 
-For CommonJS route modules in environments that can load the package synchronously, use `module.exports = { routers: [...] }`. If the consumer is CommonJS on Node 18-22.11, follow the import guidance above and create the routers after the dynamic `import('@igxjs/node-components')` resolves.
+For CommonJS route modules in environments that can load the package synchronously, use the same one-`FlexRouter`-per-`express.Router()` shape with `module.exports = { routers: [...] }`. If the consumer is CommonJS on Node 18-22.11, follow the import guidance above and create the routers after the dynamic `import('@igxjs/node-components')` resolves.
 
 ### `authenticate()` and `requireUser()` are separate steps
 
-`authenticate()` only verifies the session/token is valid; it does **not** populate `req.user`. To get the user object in the handler, chain `requireUser()` after it. Calling `requireUser()` alone is wrong — it requires authentication state to already exist on the request.
+`authenticate()` verifies the session/token; it does **not** populate `req.user`. `requireUser()` loads user data into `req.user`; it is not a replacement authorization check. For protected handlers that need `req.user`, use `authenticate()` first, then `requireUser()`.
+
+In SESSION mode, `requireUser()` simply copies `req.session[SESSION_KEY]` and does not check `authorized === true`, so do not put it before `authenticate()` as the authorization gate. In TOKEN mode, `requireUser()` also validates the bearer token and fetches Redis user data; running it before `authenticate()` works but does extra work before the lightweight auth check.
 
 ### TOKEN mode requires Redis and the two redirect URLs
 
@@ -121,8 +135,11 @@ If `SESSION_MODE: SessionMode.TOKEN`, the consumer must set `REDIS_URL`, `SSO_SU
 
 ```javascript
 app.get('/auth/providers', session.identityProviders()); // /auth/providers?app_id=tenant-a
-app.post('/auth/refresh', session.authenticate(), session.refresh(initUser)); // /auth/refresh?app_id=tenant-a
+app.post('/auth/refresh', session.authenticate(), session.requireUser(), session.refresh(initUser)); // SESSION or mode-agnostic
+app.post('/auth/token-refresh', session.authenticate(), session.refresh(initUser)); // strict TOKEN-only
 ```
+
+`refresh()` in SESSION mode reads `req.user`, so SESSION and mode-agnostic refresh routes need `authenticate()` + `requireUser()` + `refresh(...)`. Strict TOKEN-only refresh routes can use `authenticate()` + `refresh(...)` because TOKEN refresh loads the full user internally. TOKEN-mode `logout()?all=true` reads `req.user`; use `requireUser()` before `logout()` if the route supports all-device logout.
 
 ### `httpErrorHandler` must be the last middleware; `httpNotFoundHandler` goes immediately before it
 
@@ -151,8 +168,10 @@ A typical "SSO + protected API" integration looks like this. Copy from [examples
 3. In `app.js`: `await session.setup(app)` before defining routes.
 4. Wire `session.identityProviders()`, `session.callback()`, `session.refresh()`, `session.logout()` to your auth routes. For login, render or redirect to the `url` returned by `identityProviders()`; do not add a custom Axios call to `/auth/login/:idp`.
 5. Protect routes with `session.authenticate()` + `session.requireUser()`.
-6. Put `FlexRouter` definitions in feature route modules that export `routers` arrays, then mount those arrays from the app entry.
-7. Add `httpNotFoundHandler` then `httpErrorHandler` last.
+6. For SESSION or mode-agnostic refresh routes, use `session.authenticate()` + `session.requireUser()` + `session.refresh(initUser)`. For strict TOKEN-only refresh routes, `session.authenticate()` + `session.refresh(initUser)` is enough.
+7. For logout routes that support TOKEN-mode `?all=true`, use `session.authenticate()` + `session.requireUser()` + `session.logout()`.
+8. Put one `FlexRouter` around each `express.Router()` instance, export those entries in a `routers` array, then mount that array from the app entry.
+9. Add `httpNotFoundHandler` then `httpErrorHandler` last.
 
 The complete wiring is shown in [examples/full-app.js](examples/full-app.js).
 
