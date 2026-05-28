@@ -73,12 +73,12 @@ export class Logger {
 
 // Session Mode constants
 export const SessionMode: {
-  SESSION: string;
-  TOKEN: string;
+  SESSION: 'session';
+  TOKEN: 'token';
 };
 
 // Session Configuration - uses strict UPPERCASE naming convention for all property names
-export interface SessionConfig {
+export class SessionConfig {
   /** 
    * SSO Identity Provider endpoint URL
    * @example 'https://idp.example.com/open/api/v1'
@@ -95,7 +95,7 @@ export interface SessionConfig {
 
   /** 
    * Secret key used for encrypting and decrypting JWT tokens
-   * This is used internally to secure session tokens, NOT for Identity Provider authentication
+   * Used to decrypt/verify JWT payloads returned by the IdP and to secure TOKEN-mode internal JWTs
    * @example 'super-secret-jwt-key'
    * @required Required when using SSO authentication
    */
@@ -139,7 +139,7 @@ export interface SessionConfig {
   /** 
    * Secret key used for signing session cookies (should be a strong random string)
    * @example 'your-super-secret-session-key-change-this-in-production'
-   * @required Required for session-based authentication
+   * @required Required by SessionManager
    */
   SESSION_SECRET?: string;
 
@@ -190,7 +190,7 @@ export interface SessionConfig {
 
   /** 
    * JWE algorithm for token encryption
-   * @example 'dir' (Direct Key Agreement) or 'RSA-OAEP' or 'A256KW'
+   * @example 'dir' (Direct Key Agreement)
    * @default 'dir'
    * @see https://tools.ietf.org/html/rfc7518#section-4.1
    */
@@ -230,7 +230,7 @@ export interface SessionConfig {
    * @example 'https://api.myapp.com' or 'my-api-service'
    * @optional Adds additional security validation
    */
-  JWT_AUDIENCE?: string;
+  JWT_AUDIENCE?: string | string[];
 
   /** 
    * JWT subject claim (sub) - identifies the principal that is the subject of the token
@@ -312,14 +312,14 @@ export class SessionManager {
   /**
    * Get the Redis Manager
    */
-  redisManager(): RedisManager;
+  redisManager(): RedisManager | null;
 
   /**
    * Get authenticated user data (works for both SESSION and TOKEN modes)
    * @param req Express request object
    * @param includeUserData Include user data in the response (default: false)
-   * @returns Promise resolving to full user data object
-   * @throws CustomError If user is not authenticated
+   * @returns Promise resolving to user data; SESSION mode may return undefined for an empty session
+   * @throws CustomError In TOKEN mode if token authentication or Redis lookup fails
    * @example
    * ```javascript
    * // Use in custom middleware
@@ -334,7 +334,7 @@ export class SessionManager {
    * });
    * ```
    */
-  getUser(req: Request, includeUserData: boolean | false): Promise<SessionUser>;
+  getUser(req: Request, includeUserData?: boolean): Promise<Partial<SessionUser> | SessionUser | undefined>;
 
   /**
    * Initialize the session configurations and middleware
@@ -452,8 +452,8 @@ export class SessionManager {
 // Custom Error class
 export class CustomError extends Error {
   code: number;
-  data: object;
-  error: object;
+  data?: object;
+  error?: object;
 
   /**
    * Construct a custom error
@@ -462,7 +462,7 @@ export class CustomError extends Error {
    * @param error Error object (optional)
    * @param data Additional data (optional)
    */
-  constructor(code: number, message: string, error?: object, data?: object);
+  constructor(code: number, message: string, error?: Error | object | null, data?: object | null);
 }
 
 // FlexRouter class for Express routing
@@ -492,16 +492,16 @@ export class RedisManager {
   /**
    * Connect with Redis
    * @param redisUrl Redis connection URL
-   * @param certPath Certificate path for TLS connections
+   * @param certPath Certificate path for TLS connections; required for rediss:// URLs
    * @returns Returns true if Redis server is connected
    */
-  connect(redisUrl: string, certPath: string): Promise<boolean>;
+  connect(redisUrl?: string | null, certPath?: string | null): Promise<boolean>;
 
   /**
    * Get Redis client
-   * @returns Returns Redis client instance
+   * @returns Returns Redis client instance, or null before a successful connection
    */
-  getClient(): RedisClientType;
+  getClient(): RedisClientType | null;
 
   /**
    * Determine if the Redis server is connected
@@ -520,9 +520,7 @@ export class RedisManager {
 export interface JwtManagerOptions {
   /** 
    * JWE algorithm for token encryption
-   * @example 'dir' (Direct Key Agreement - symmetric encryption, recommended for most cases)
-   * @example 'RSA-OAEP' (RSA with OAEP padding - for asymmetric encryption)
-   * @example 'A256KW' (AES Key Wrap with 256-bit key)
+   * @example 'dir' (Direct Key Agreement - symmetric encryption, recommended for current string-secret API)
    * @default 'dir'
    * @see https://tools.ietf.org/html/rfc7518#section-4.1
    */
@@ -583,7 +581,7 @@ export interface JwtManagerOptions {
    * @example ['api.myapp.com', 'admin.myapp.com'] (can be array)
    * @optional Recommended for production environments
    */
-  JWT_AUDIENCE?: string;
+  JWT_AUDIENCE?: string | string[];
 
   /** 
    * JWT subject claim (sub) - identifies the principal (subject) of the token
@@ -602,7 +600,7 @@ export interface JwtManagerOptions {
 export interface JwtEncryptOptions {
   /** 
    * Override default JWE algorithm for this specific token
-   * @example 'dir' or 'RSA-OAEP'
+   * @example 'dir'
    * @use-case Use when you need different encryption algorithms for different token types
    */
   algorithm?: string;
@@ -644,7 +642,7 @@ export interface JwtEncryptOptions {
    * @example ['service1.myapp.com', 'service2.myapp.com'] (multiple audiences)
    * @use-case Use when tokens are intended for different services
    */
-  audience?: string;
+  audience?: string | string[];
 
   /** 
    * Override default subject claim for this specific token
@@ -691,7 +689,7 @@ export interface JwtDecryptOptions {
    * @example ['service1.myapp.com', 'service2.myapp.com'] (multiple valid audiences)
    * @use-case Use to ensure tokens are intended for your service
    */
-  audience?: string;
+  audience?: string | string[];
 
   /** 
    * Expected subject claim (sub) for validation
@@ -712,7 +710,7 @@ export class JwtManager {
   clockTolerance: number;
   secretHashAlgorithm: string;
   issuer?: string;
-  audience?: string;
+  audience?: string | string[];
   subject?: string;
 
   /**
@@ -835,8 +833,8 @@ export const httpHelper: {
 export function httpError(
   code: number,
   message: string,
-  error?: object,
-  data?: object
+  error?: Error | object | null,
+  data?: object | null
 ): CustomError;
 
 /**
