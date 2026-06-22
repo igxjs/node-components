@@ -1022,9 +1022,13 @@ export class SessionManager {
     const hashIndex = failureUrl.indexOf('#');
     const baseUrl = hashIndex === -1 ? failureUrl : failureUrl.slice(0, hashIndex);
     const hash = hashIndex === -1 ? '' : failureUrl.slice(hashIndex);
-    const separator = baseUrl.includes('?')
-      ? (baseUrl.endsWith('?') || baseUrl.endsWith('&') ? '' : '&')
-      : '?';
+    let separator = '?';
+    if (baseUrl.includes('?')) {
+      separator = '&';
+      if (baseUrl.endsWith('?') || baseUrl.endsWith('&')) {
+        separator = '';
+      }
+    }
     return `${baseUrl}${separator}reason=${encodeURIComponent(reason)}${hash}`;
   }
 
