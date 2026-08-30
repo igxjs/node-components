@@ -70,7 +70,7 @@ module.exports = {
 };
 ```
 
-If the consumer is CommonJS on Node 18-22.11, the package must be loaded with dynamic `import()`. In that case, build the `routers` array after the import resolves instead of using a synchronous top-level `require()`.
+If the consumer is CommonJS on Node 22.0-22.11, the package must be loaded with dynamic `import()`. In that case, build the `routers` array after the import resolves instead of using a synchronous top-level `require()`. Node versions below 22 are unsupported by the package.
 
 ## Other patterns
 

@@ -75,7 +75,7 @@ Create a well-tested, production-ready collection of Node.js components that sol
 ## Key Requirements
 
 ### Technical Requirements
-- Node.js >= 18
+- Node.js >= 22
 - ES modules (type: "module")
 - Express.js compatible
 - Optional Redis integration

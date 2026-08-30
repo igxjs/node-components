@@ -24,7 +24,7 @@ This skill is for **consumers** of the library, not for modifying the library it
 - Package name: `@igxjs/node-components`
 - Registry: GitHub Packages (`https://npm.pkg.github.com`) — installation requires authenticating with that registry
 - Module type: ESM-only build (`"type": "module"` in package.json). The package source uses `export` and ships no CommonJS bundle.
-- Engines: Node.js >= 18
+- Engines: Node.js >= 22 (`connect-redis` v10 sets this runtime floor)
 - Peer dep: `express` ^4 || ^5 (consumer must install)
 - TypeScript types are bundled via `index.d.ts`
 
@@ -34,11 +34,11 @@ The package has no top-level `await`, so all three import styles work — pick b
 
 | Consumer project | Import style | Notes |
 |------------------|--------------|-------|
-| ESM (`"type": "module"` or `.mjs`) | `import { SessionManager } from '@igxjs/node-components'` | Recommended; matches the package's native shape. |
+| ESM on Node ≥ 22 (`"type": "module"` or `.mjs`) | `import { SessionManager } from '@igxjs/node-components'` | Recommended; matches the package's native shape. |
 | CommonJS on Node ≥ 22.12 | `const { SessionManager } = require('@igxjs/node-components')` | Works because Node 22.12+ stably supports `require()` loading ESM packages that have no top-level await. No flag needed. |
-| CommonJS on Node 18–22.11 | `const { SessionManager } = await import('@igxjs/node-components')` | Use dynamic import inside an `async` function. Synchronous `require()` will throw `ERR_REQUIRE_ESM`. |
+| CommonJS on Node 22.0–22.11 | `const { SessionManager } = await import('@igxjs/node-components')` | Use dynamic import inside an `async` function. Synchronous `require()` will throw `ERR_REQUIRE_ESM`. |
 
-If unsure of the consumer's Node version, check `node -v` or `engines` in their `package.json` before recommending `require()`.
+Node versions below 22 are unsupported. Check `node -v` or `engines` in the consumer's `package.json` before installing or recommending an import style.
 
 The full public API surface is enumerated in [references/api-surface.md](references/api-surface.md). Consult it before recommending an export or method.
 
@@ -49,8 +49,9 @@ The full public API surface is enumerated in [references/api-surface.md](referen
    @igxjs:registry=https://npm.pkg.github.com
    //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
    ```
-2. Install: `npm install @igxjs/node-components express`
-3. Pick the import style based on the consumer's project — see the table above. ESM consumers use `import`; CJS consumers on Node ≥ 22.12 can use `require()` directly; older CJS consumers need dynamic `import()`.
+2. Confirm the consumer runs Node ≥ 22; upgrade Node first if it does not.
+3. Install: `npm install @igxjs/node-components express`
+4. Pick the import style based on the consumer's project — see the table above. ESM consumers use `import`; CJS consumers on Node ≥ 22.12 can use `require()` directly; CJS consumers on Node 22.0–22.11 need dynamic `import()`.
 
 ## Component Selection Map
 
@@ -115,7 +116,7 @@ for (const router of routers) {
 }
 ```
 
-For CommonJS route modules in environments that can load the package synchronously, use the same one-`FlexRouter`-per-`express.Router()` shape with `module.exports = { routers: [...] }`. If the consumer is CommonJS on Node 18-22.11, follow the import guidance above and create the routers after the dynamic `import('@igxjs/node-components')` resolves.
+For CommonJS route modules in environments that can load the package synchronously, use the same one-`FlexRouter`-per-`express.Router()` shape with `module.exports = { routers: [...] }`. If the consumer is CommonJS on Node 22.0-22.11, follow the import guidance above and create the routers after the dynamic `import('@igxjs/node-components')` resolves.
 
 ### `authenticate()` and `requireUser()` are separate steps
 

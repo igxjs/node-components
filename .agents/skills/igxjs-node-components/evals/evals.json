@@ -21,14 +21,20 @@
     },
     {
       "id": 4,
-      "prompt": "My service is CommonJS on Node 20 and I need to use JwtManager from @igxjs/node-components for password reset links. Give me the right import style and a secure JWE example.",
-      "expected_output": "Uses dynamic import rather than require for Node 20 CommonJS, creates JwtManager with JWT_* constructor options, uses camelCase per-call options, uses a separate secret from SSO/session secrets, and decrypts with subject validation.",
+      "prompt": "My service is CommonJS on Node 22.11 and I need to use JwtManager from @igxjs/node-components for password reset links. Give me the right import style and a secure JWE example.",
+      "expected_output": "Uses dynamic import rather than require for Node 22.11 CommonJS, creates JwtManager with JWT_* constructor options, uses camelCase per-call options, uses a separate secret from SSO/session secrets, and decrypts with subject validation.",
       "files": []
     },
     {
       "id": 5,
       "prompt": "Refactor my Express app to use FlexRouter. I have users and orders routers, and I want each feature router file to export its mount definitions instead of putting all new FlexRouter calls in app.js. Show both the feature file shape and the app.js mounting loop.",
       "expected_output": "Defines `export const routers = [new FlexRouter(...)]` inside each feature route module, creates one FlexRouter per express.Router instance, keeps app.js limited to importing/combining those arrays and calling mount(app, basePath), and avoids using one FlexRouter as an aggregate for multiple routers.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Our downstream Express app still runs Node 20. Can I install the latest @igxjs/node-components and use it from CommonJS? Show the integration if it is supported.",
+      "expected_output": "States that the current package requires Node 22 because of its runtime dependencies, does not present Node 20 as supported, recommends upgrading Node before installation, and then explains the Node 22 CommonJS import boundary: require on Node 22.12+ or dynamic import on Node 22.0-22.11.",
       "files": []
     }
   ]

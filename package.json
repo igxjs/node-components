@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/igxjs/node-components#readme",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "@redis/client": "^6.2.1",

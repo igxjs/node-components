@@ -222,7 +222,7 @@ fetch('/api/protected', {
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 22
 - Express.js >= 4.x
 - Redis (optional, for session storage)
 

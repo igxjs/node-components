@@ -1,6 +1,6 @@
 # RedisManager Reference
 
-Wraps `@redis/client` (Node Redis v5+) with TLS support, reconnection handling, and a tiny lifecycle API. Most consumers don't need it directly — `SessionManager` uses it internally. Reach for it when:
+Wraps `@redis/client` (Node Redis v6) with TLS support, reconnection handling, and a tiny lifecycle API. Most consumers don't need it directly — `SessionManager` uses it internally. Reach for it when:
 - The app needs Redis for application data beyond sessions
 - A health check needs to probe Redis
 - Tests need a connect/disconnect lifecycle hook
@@ -41,7 +41,7 @@ This avoids opening a second connection for the same Redis instance.
 
 ## Direct client usage
 
-The returned client is a standard Node Redis v5 client; all of its commands are available:
+The returned client is a standard Node Redis v6 client; all of its commands are available:
 
 ```javascript
 await client.set('key', 'value');

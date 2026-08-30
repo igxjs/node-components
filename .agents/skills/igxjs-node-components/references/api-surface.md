@@ -27,7 +27,13 @@ import {
 } from '@igxjs/node-components';
 ```
 
-Also exported: `JWTPayload` (re-exported from `jose`).
+The TypeScript declarations also re-export the `JWTPayload` type from `jose`:
+
+```typescript
+import type { JWTPayload } from '@igxjs/node-components';
+```
+
+`JWTPayload` is type-only and is not present in the package's runtime exports.
 
 ## Type augmentation (TypeScript)
 
@@ -127,7 +133,7 @@ class RedisManager {
 }
 ```
 
-Underlying client is `@redis/client` (Node Redis v5+). Use `rediss://` URLs for TLS and pass `certPath`.
+Underlying client is `@redis/client` (Node Redis v6). Use `rediss://` URLs for TLS and pass `certPath`.
 
 ## Logger
 

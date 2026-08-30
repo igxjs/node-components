@@ -3,7 +3,7 @@
 ## Technologies Used
 
 ### Core Runtime
-- **Node.js >= 18** - Required for ES modules, Web Crypto API, modern features
+- **Node.js >= 22** - Required by the current runtime dependency set, including connect-redis v10
 - **ES Modules** - Modern module system (`type: "module"`)
 - **JavaScript (ES2022)** - No TypeScript source, but includes .d.ts definitions
 
@@ -15,7 +15,7 @@
 ### Key Dependencies
 
 #### Authentication & Security
-- **jose** (^6.2.1) - JWT encryption using JWE standards
+- **jose** (^6.2.10) - JWT encryption using JWE standards
   - Used in: JwtManager
   - Purpose: Secure JWT encryption/decryption
   - Key Features: JWE support, modern cryptography
@@ -26,31 +26,31 @@
   - Storage: Redis or memory
 
 #### Redis Integration
-- **@redis/client** (^5.11.0) - Official Redis client
+- **@redis/client** (^6.2.1) - Official Redis client
   - Used in: RedisManager, SessionManager
   - Purpose: Session storage, data caching
   - Features: TLS support, auto-reconnection
 
-- **connect-redis** (^9.0.0) - Redis session store adapter
+- **connect-redis** (^10.0.0) - Redis session store adapter
   - Used in: SessionManager
   - Purpose: Bridge express-session to Redis
 
-- **memorystore** (^1.6.7) - Memory-based session store
+- **memorystore** (^1.6.8) - Memory-based session store
   - Used in: SessionManager (fallback)
   - Purpose: Session storage when Redis unavailable
 
 #### HTTP Client
-- **axios** (^1.13.6) - HTTP client
+- **axios** (^1.20.0) - HTTP client
   - Used in: SessionManager
   - Purpose: SSO API calls, token refresh
 
 ### Development Dependencies
 
 #### Testing
-- **mocha** (^12.0.0-beta-10) - Test framework
+- **mocha** (^12.0.0-rc.6) - Test framework
 - **chai** (^6.2.2) - Assertion library
-- **sinon** (^21.0.3) - Mocking/stubbing
-- **supertest** (^7.0.0) - HTTP assertions
+- **sinon** (^22.1.0) - Mocking/stubbing
+- **supertest** (^7.2.2) - HTTP assertions
 
 #### Type Definitions
 - **@types/express** (^5.0.6) - Express TypeScript types
@@ -60,7 +60,7 @@
 ### Prerequisites
 ```bash
 # Required
-Node.js >= 18
+Node.js >= 22
 npm >= 9
 
 # Optional (for testing)

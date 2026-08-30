@@ -12,10 +12,14 @@ cat >> .npmrc <<'EOF'
 //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 EOF
 
-# 2. Install the package and its peer dependency (Express).
+# 2. Verify the supported runtime. Stop before installation when Node is too old.
+node -e "const major = Number(process.versions.node.split('.')[0]); if (major < 22) { console.error('Node.js >= 22 is required'); process.exit(1); }"
+node -v
+
+# 3. Install the package and its peer dependency (Express).
 npm install @igxjs/node-components express
 
-# 3. Choose how to import based on your consumer project:
+# 4. Choose how to import based on your consumer project:
 #
 #    ESM project ("type": "module" in package.json, or .mjs files):
 #      import { SessionManager } from '@igxjs/node-components';
@@ -24,10 +28,8 @@ npm install @igxjs/node-components express
 #      const { SessionManager } = require('@igxjs/node-components');
 #      # require() of ESM packages is stable since Node 22.12.
 #
-#    CommonJS project on Node 18.x – 22.11:
+#    CommonJS project on Node 22.0 – 22.11:
 #      const { SessionManager } = await import('@igxjs/node-components');
 #      # Synchronous require() throws ERR_REQUIRE_ESM on these versions;
 #      # use dynamic import() inside an async function instead.
 #
-# Verify your Node version before recommending require():
-node -v
